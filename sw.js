@@ -1,11 +1,15 @@
-/* Service Worker для редактора персонажа */
-const CACHE_VERSION = 'v1.0.0';
+const CACHE_VERSION = 'v2.0.0';
 const CACHE_NAME = `character-editor-${CACHE_VERSION}`;
 
-// Файлы для предварительного кэширования (app shell)
 const PRECACHE_URLS = [
   './',
   './index.html',
+  './app.js',
+  './storage.js',
+  './renderer.js',
+  './history.js',
+  './exporter.js',
+  './gallery.js',
   './manifest.json',
   './icons/icon-72.png',
   './icons/icon-96.png',
@@ -19,115 +23,65 @@ const PRECACHE_URLS = [
   './icons/icon-maskable-512.png'
 ];
 
-// ============ INSTALL ============
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('[SW] Предкэширование app shell');
-        // Кэшируем по одному, чтобы одна ошибка не сломала всю установку
-        return Promise.allSettled(
-          PRECACHE_URLS.map((url) =>
-            cache.add(url).catch((err) => {
-              console.warn('[SW] Не удалось закэшировать:', url, err);
-            })
-          )
-        );
-      })
+      .then((cache) => Promise.allSettled(PRECACHE_URLS.map(u => cache.add(u).catch(() => {}))))
       .then(() => self.skipWaiting())
   );
 });
 
-// ============ ACTIVATE ============
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys()
-      .then((keys) =>
-        Promise.all(
-          keys
-            .filter((key) => key.startsWith('character-editor-') && key !== CACHE_NAME)
-            .map((key) => {
-              console.log('[SW] Удаляю старый кэш:', key);
-              return caches.delete(key);
-            })
-        )
-      )
-      .then(() => self.clients.claim())
+    caches.keys().then(keys => Promise.all(
+      keys.filter(k => k.startsWith('character-editor-') && k !== CACHE_NAME)
+        .map(k => caches.delete(k))
+    )).then(() => self.clients.claim())
   );
 });
 
-// ============ FETCH ============
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-
-  // Пропускаем не-GET запросы
   if (request.method !== 'GET') return;
-
-  // Пропускаем chrome-extension, devtools и т.п.
   const url = new URL(request.url);
   if (!url.protocol.startsWith('http')) return;
 
-  // Стратегия для навигации (HTML) — Network First, fallback на кэш
   if (request.mode === 'navigate' || request.destination === 'document') {
     event.respondWith(
       fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          return response;
+        .then(r => {
+          const copy = r.clone();
+          caches.open(CACHE_NAME).then(c => c.put(request, copy));
+          return r;
         })
-        .catch(() =>
-          caches.match(request).then((cached) =>
-            cached || caches.match('./index.html')
-          )
-        )
+        .catch(() => caches.match(request).then(c => c || caches.match('./index.html')))
     );
     return;
   }
 
-  // Стратегия Cache First для статики (иконки, шрифты, скрипты)
   event.respondWith(
-    caches.match(request).then((cached) => {
+    caches.match(request).then(cached => {
       if (cached) {
-        // Обновляем в фоне (stale-while-revalidate)
-        fetch(request)
-          .then((response) => {
-            if (response && response.status === 200 && response.type === 'basic') {
-              caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
-            }
-          })
-          .catch(() => {});
+        fetch(request).then(r => {
+          if (r && r.status === 200 && r.type === 'basic') {
+            caches.open(CACHE_NAME).then(c => c.put(request, r.clone()));
+          }
+        }).catch(() => {});
         return cached;
       }
-
-      // Если нет в кэше — идём в сеть и кэшируем
-      return fetch(request)
-        .then((response) => {
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          return response;
-        })
-        .catch((err) => {
-          console.warn('[SW] Офлайн, ресурс недоступен:', request.url);
-          throw err;
-        });
+      return fetch(request).then(r => {
+        if (!r || r.status !== 200 || r.type !== 'basic') return r;
+        const copy = r.clone();
+        caches.open(CACHE_NAME).then(c => c.put(request, copy));
+        return r;
+      });
     })
   );
 });
 
-// ============ MESSAGES ============
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-  if (event.data && event.data.type === 'CLEAR_CACHE') {
-    event.waitUntil(
-      caches.keys().then((keys) =>
-        Promise.all(keys.map((key) => caches.delete(key)))
-      )
-    );
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data?.type === 'CLEAR_CACHE') {
+    event.waitUntil(caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))));
   }
 });
