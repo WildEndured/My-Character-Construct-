@@ -1,3 +1,21 @@
 {
-  "manifest": "{\n  \"name\": \"Редактор персонажа\",\n  \"short_name\": \"Picrew\",\n  \"description\": \"Собери своего персонажа из ассетов\",\n  \"start_url\": \"./index.html\",\n  \"scope\": \"./\",\n  \"display\": \"fullscreen\",\n  \"orientation\": \"landscape\",\n  \"background_color\": \"#1a1a24\",\n  \"theme_color\": \"#764ba2\",\n  \"lang\": \"ru\",\n  \"categories\": [\"art\", \"entertainment\"],\n  \"icons\": [\n    {\n      \"src\": \"icon-192.png\",\n      \"sizes\": \"192x192\",\n      \"type\": \"image/png\",\n      \"purpose\": \"any maskable\"\n    },\n    {\n      \"src\": \"icon-512.png\",\n      \"sizes\": \"512x512\",\n      \"type\": \"image/png\",\n      \"purpose\": \"any maskable\"\n    }\n  ]\n}"
+  "name": "Редактор персонажа",
+  "short_name": "Picrew",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#1a1a24",
+  "theme_color": "#764ba2",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
 }
