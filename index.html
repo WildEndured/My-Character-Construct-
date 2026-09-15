@@ -2,38 +2,990 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#764ba2">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Редактор персонажа</title>
-
-<!-- 👇 PWA -->
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png">
-
 <style>
   * {
-    margin:0; padding:0; box-sizing:border-box;
-    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-    -webkit-tap-highlight-color:transparent;
-    -webkit-user-select:none; user-select:none;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
   }
+  
   html, body {
-    width:100%; height:100%; overflow:hidden;
-    background:#1a1a24; overscroll-behavior:none;
-    touch-action:none;
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #1a1a1a;
+    color: #fff;
+    touch-action: none;
   }
-  .app {
-    position:fixed; inset:0;
-    display:flex; flex-direction:row;
-    padding:env(safe-area-inset-top) env(safe-area-inset-right)
-            env(safe-area-inset-bottom) env(safe-area-inset-left);
+  
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
   }
-  /* ХОЛСТ */
-  .stage {
-    flex:1; position:relative;
-    display:flex; align-items:center; justify-content:center;
+  
+  /* Верхняя панель */
+  #toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: #2a2a2a;
+    border-bottom: 1px solid #444;
+    flex-shrink: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  
+  #toolbar::-webkit-scrollbar { display: none; }
+  
+  .btn {
+    background: #3a3a3a;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+  }
+  
+  .btn:active { background: #4a4a4a; }
+  .btn.primary { background: #4a7cff; border-color: #4a7cff; }
+  .btn.primary:active { background: #3a6cef; }
+  .btn.danger { background: #c0392b; border-color: #c0392b; }
+  .btn.danger:active { background: #a0291b; }
+  
+  /* Основная область */
+  #main {
+    flex: 1;
+    display: flex;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  /* Холст */
+  #canvas-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #111;
+    touch-action: none;
+  }
+  
+  #canvas-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform-origin: 0 0;
+  }
+  
+  #canvas {
+    background: #fff;
+    box-shadow: 0 0 40px rgba(0,0,0,0.6);
+    image-rendering: auto;
+  }
+  
+  /* Нижняя панель с категориями */
+  #categories {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    background: #2a2a2a;
+    border-top: 1px solid #444;
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex-shrink: 0;
+    min-height: 60px;
+  }
+  
+  #categories::-webkit-scrollbar { display: none; }
+  
+  .cat-tab {
+    background: #3a3a3a;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: pointer;
+    flex-shrink: 0;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    position: relative;
+  }
+  
+  .cat-tab.active {
+    background: #4a7cff;
+    border-color: #4a7cff;
+  }
+  
+  .cat-tab .del-x {
+    margin-left: 8px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    line-height: 1;
+  }
+  
+  /* Панель элементов */
+  #items-panel {
+    position: absolute;
+    bottom: 70px;
+    left: 0;
+    right: 0;
+    background: #242424;
+    border-top: 1px solid #444;
+    max-height: 40vh;
+    display: none;
+    flex-direction: column;
+    z-index: 10;
+    border-radius: 12px 12px 0 0;
+  }
+  
+  #items-panel.open { display: flex; }
+  
+  #items-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid #444;
+  }
+  
+  #items-header span { font-size: 14px; font-weight: 500; }
+  
+  #items-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+    padding: 10px;
+    overflow-y: auto;
+    max-height: 35vh;
+  }
+  
+  .item-card {
+    background: #333;
+    border: 2px solid #444;
+    border-radius: 8px;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: hidden;
+    position: relative;
+    font-size: 11px;
+    padding: 4px;
+    text-align: center;
+    color: #ccc;
+  }
+  
+  .item-card.active {
+    border-color: #4a7cff;
+    box-shadow: 0 0 8px rgba(74,124,255,0.5);
+  }
+  
+  .item-card img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+  }
+  
+  .item-card .del-x {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(192,57,43,0.9);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    z-index: 2;
+  }
+  
+  .add-item-btn {
+    background: #2a2a2a;
+    border: 2px dashed #555;
+    color: #888;
+    font-size: 28px;
+  }
+  
+  /* Верхние кнопки зума */
+  #zoom-controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 5;
+  }
+  
+  #zoom-controls .btn {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    font-size: 20px;
+    background: rgba(50,50,50,0.85);
+    backdrop-filter: blur(6px);
+    border-radius: 22px;
+  }
+  
+  #zoom-info {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(0,0,0,0.6);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    color: #aaa;
+    z-index: 5;
+    pointer-events: none;
+  }
+  
+  /* Модалка */
+  .modal-bg {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  
+  .modal-bg.open { display: flex; }
+  
+  .modal {
+    background: #2a2a2a;
+    border-radius: 12px;
+    padding: 20px;
+    width: 100%;
+    max-width: 400px;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  
+  .modal h3 { margin: 0 0 15px; font-size: 16px; }
+  
+  .modal label {
+    display: block;
+    font-size: 13px;
+    color: #aaa;
+    margin-bottom: 6px;
+    margin-top: 12px;
+  }
+  
+  .modal input[type="text"],
+  .modal input[type="number"],
+  .modal textarea {
+    width: 100%;
+    background: #1a1a1a;
+    border: 1px solid #444;
+    color: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  
+  .modal input[type="file"] {
+    width: 100%;
+    color: #ccc;
+    font-size: 13px;
+    padding: 8px 0;
+  }
+  
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 20px;
+  }
+  
+  .modal-actions .btn { flex: 1; }
+  
+  .hint {
+    font-size: 11px;
+    color: #888;
+    margin-top: 6px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="toolbar">
+    <button class="btn" id="btn-export">💾 Экспорт PNG</button>
+    <button class="btn" id="btn-add-cat">➕ Категория</button>
+    <button class="btn" id="btn-reset">🔄 Сброс</button>
+  </div>
+  
+  <div id="main">
+    <div id="canvas-wrap">
+      <div id="canvas-container">
+        <canvas id="canvas" width="4096" height="4096"></canvas>
+      </div>
+      <div id="zoom-info">4096 × 4096 · 300 DPI · Масштаб 100%</div>
+      <div id="zoom-controls">
+        <button class="btn" id="zoom-in">＋</button>
+        <button class="btn" id="zoom-out">－</button>
+        <button class="btn" id="zoom-fit" title="Вписать">⤢</button>
+      </div>
+    </div>
+  </div>
+  
+  <div id="items-panel">
+    <div id="items-header">
+      <span id="items-title">Категория</span>
+      <button class="btn" id="btn-close-items" style="min-height:32px;padding:6px 12px;font-size:13px;">Закрыть</button>
+    </div>
+    <div id="items-list"></div>
+  </div>
+  
+  <div id="categories"></div>
+</div>
+
+<!-- Модалка добавления категории -->
+<div class="modal-bg" id="modal-cat">
+  <div class="modal">
+    <h3>Новая категория</h3>
+    <label>Название</label>
+    <input type="text" id="cat-name" placeholder="Например: Глаза">
+    <div class="modal-actions">
+      <button class="btn" id="cat-cancel">Отмена</button>
+      <button class="btn primary" id="cat-save">Добавить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка добавления элемента -->
+<div class="modal-bg" id="modal-item">
+  <div class="modal">
+    <h3>Добавить элемент</h3>
+    <label>Название</label>
+    <input type="text" id="item-name" placeholder="Например: Круглые глаза">
+    <label>Изображение (PNG с прозрачностью)</label>
+    <input type="file" id="item-file" accept="image/*">
+    <div class="hint">Рекомендуется PNG 4096×4096 с прозрачным фоном</div>
+    <div class="modal-actions">
+      <button class="btn" id="item-cancel">Отмена</button>
+      <button class="btn primary" id="item-save">Добавить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+  
+  // ============ Константы ============
+  const CANVAS_SIZE = 4096;
+  const DPI = 300;
+  
+  // ============ Состояние ============
+  const state = {
+    categories: [],      // [{id, name, items:[{id, name, src, img}]}]
+    activeCategoryId: null,
+    activeItems: {},     // {categoryId: itemId}
+    scale: 1,
+    offsetX: 0,
+    offsetY: 0,
+    minScale: 0.05,
+    maxScale: 4,
+  };
+  
+  let uid = 1;
+  const nextId = () => 'id_' + (uid++);
+  
+  // ============ DOM ============
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const canvasContainer = document.getElementById('canvas-container');
+  const canvasWrap = document.getElementById('canvas-wrap');
+  const categoriesEl = document.getElementById('categories');
+  const itemsPanel = document.getElementById('items-panel');
+  const itemsList = document.getElementById('items-list');
+  const itemsTitle = document.getElementById('items-title');
+  const zoomInfo = document.getElementById('zoom-info');
+  
+  // ============ Рендер холста ============
+  function renderCanvas() {
+    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    // Белый фон
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    
+    // Рисуем активные элементы каждой категории в порядке добавления
+    for (const cat of state.categories) {
+      const activeItemId = state.activeItems[cat.id];
+      if (!activeItemId) continue;
+      const item = cat.items.find(i => i.id === activeItemId);
+      if (item && item.img) {
+        try {
+          ctx.drawImage(item.img, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+        } catch(e) {
+          console.warn('Ошибка отрисовки', e);
+        }
+      }
+    }
+  }
+  
+  // ============ Трансформация холста ============
+  function applyTransform() {
+    const w = canvasWrap.clientWidth;
+    const h = canvasWrap.clientHeight;
+    const scaledW = CANVAS_SIZE * state.scale;
+    const scaledH = CANVAS_SIZE * state.scale;
+    
+    // Центрируем + смещение
+    const x = (w - scaledW) / 2 + state.offsetX;
+    const y = (h - scaledH) / 2 + state.offsetY;
+    
+    canvas.style.width = scaledW + 'px';
+    canvas.style.height = scaledH + 'px';
+    canvas.style.position = 'absolute';
+    canvas.style.left = x + 'px';
+    canvas.style.top = y + 'px';
+    
+    zoomInfo.textContent = `4096 × 4096 · 300 DPI · Масштаб ${Math.round(state.scale * 100)}%`;
+  }
+  
+  function setScale(newScale, centerX, centerY) {
+    newScale = Math.max(state.minScale, Math.min(state.maxScale, newScale));
+    if (centerX === undefined) centerX = canvasWrap.clientWidth / 2;
+    if (centerY === undefined) centerY = canvasWrap.clientHeight / 2;
+    
+    const oldScale = state.scale;
+    const ratio = newScale / oldScale;
+    
+    // Смещение относительно центра зума
+    state.offsetX = (state.offsetX - (centerX - canvasWrap.clientWidth/2)) * ratio + (centerX - canvasWrap.clientWidth/2);
+    state.offsetY = (state.offsetY - (centerY - canvasWrap.clientHeight/2)) * ratio + (centerY - canvasWrap.clientHeight/2);
+    state.scale = newScale;
+    applyTransform();
+  }
+  
+  function fitToScreen() {
+    const w = canvasWrap.clientWidth;
+    const h = canvasWrap.clientHeight;
+    const pad = 40;
+    const s = Math.min((w - pad) / CANVAS_SIZE, (h - pad) / CANVAS_SIZE);
+    state.scale = s;
+    state.offsetX = 0;
+    state.offsetY = 0;
+    applyTransform();
+  }
+  
+  // ============ Жесты (pinch zoom + pan) ============
+  let touches = {};
+  let lastDist = 0;
+  let lastMid = { x: 0, y: 0 };
+  let isPanning = false;
+  let panStart = { x: 0, y: 0 };
+  
+  canvasWrap.addEventListener('touchstart', (e) => {
+    // Собираем активные точки
+    const rect = canvasWrap.getBoundingClientRect();
+    for (const t of e.changedTouches) {
+      touches[t.identifier] = {
+        x: t.clientX - rect.left,
+        y: t.clientY - rect.top,
+        startX: t.clientX - rect.left,
+        startY: t.clientY - rect.top,
+      };
+    }
+    
+    const ids = Object.keys(touches);
+    if (ids.length === 1) {
+      isPanning = true;
+      panStart = {
+        x: touches[ids[0]].x,
+        y: touches[ids[0]].y,
+        offsetX: state.offsetX,
+        offsetY: state.offsetY,
+      };
+    } else if (ids.length === 2) {
+      isPanning = false;
+      const [a, b] = ids.map(id => touches[id]);
+      lastDist = Math.hypot(a.x - b.x, a.y - b.y);
+      lastMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    }
+  }, { passive: false });
+  
+  canvasWrap.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const rect = canvasWrap.getBoundingClientRect();
+    for (const t of e.changedTouches) {
+      if (touches[t.identifier]) {
+        touches[t.identifier].x = t.clientX - rect.left;
+        touches[t.identifier].y = t.clientY - rect.top;
+      }
+    }
+    
+    const ids = Object.keys(touches);
+    if (ids.length === 1 && isPanning) {
+      const t = touches[ids[0]];
+      state.offsetX = panStart.offsetX + (t.x - panStart.x);
+      state.offsetY = panStart.offsetY + (t.y - panStart.y);
+      applyTransform();
+    } else if (ids.length === 2) {
+      const [a, b] = ids.map(id => touches[id]);
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      
+      if (lastDist > 0) {
+        const newScale = state.scale * (dist / lastDist);
+        setScale(newScale, mid.x, mid.y);
+        
+        // Панорамирование по движению середины
+        state.offsetX += mid.x - lastMid.x;
+        state.offsetY += mid.y - lastMid.y;
+        applyTransform();
+      }
+      lastDist = dist;
+      lastMid = mid;
+    }
+  }, { passive: false });
+  
+  const endTouch = (e) => {
+    for (const t of e.changedTouches) {
+      delete touches[t.identifier];
+    }
+    const ids = Object.keys(touches);
+    if (ids.length === 0) {
+      isPanning = false;
+      lastDist = 0;
+    } else if (ids.length === 1) {
+      isPanning = true;
+      const t = touches[ids[0]];
+      panStart = {
+        x: t.x,
+        y: t.y,
+        offsetX: state.offsetX,
+        offsetY: state.offsetY,
+      };
+      lastDist = 0;
+    }
+  };
+  
+  canvasWrap.addEventListener('touchend', endTouch, { passive: false });
+  canvasWrap.addEventListener('touchcancel', endTouch, { passive: false });
+  
+  // Мышь (для тестирования на ПК)
+  let mouseDown = false;
+  let mouseStart = { x: 0, y: 0 };
+  let mouseOffsetStart = { x: 0, y: 0 };
+  
+  canvasWrap.addEventListener('mousedown', (e) => {
+    mouseDown = true;
+    mouseStart = { x: e.clientX, y: e.clientY };
+    mouseOffsetStart = { x: state.offsetX, y: state.offsetY };
+  });
+  
+  window.addEventListener('mousemove', (e) => {
+    if (!mouseDown) return;
+    state.offsetX = mouseOffsetStart.x + (e.clientX - mouseStart.x);
+    state.offsetY = mouseOffsetStart.y + (e.clientY - mouseStart.y);
+    applyTransform();
+  });
+  
+  window.addEventListener('mouseup', () => { mouseDown = false; });
+  
+  canvasWrap.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = canvasWrap.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    setScale(state.scale * factor, cx, cy);
+  }, { passive: false });
+  
+  // ============ Рендер категорий ============
+  function renderCategories() {
+    categoriesEl.innerHTML = '';
+    for (const cat of state.categories) {
+      const tab = document.createElement('div');
+      tab.className = 'cat-tab' + (cat.id === state.activeCategoryId ? ' active' : '');
+      tab.dataset.id = cat.id;
+      
+      const name = document.createElement('span');
+      name.textContent = cat.name;
+      tab.appendChild(name);
+      
+      const del = document.createElement('div');
+      del.className = 'del-x';
+      del.textContent = '×';
+      del.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteCategory(cat.id);
+      });
+      tab.appendChild(del);
+      
+      tab.addEventListener('click', () => {
+        openCategory(cat.id);
+      });
+      
+      categoriesEl.appendChild(tab);
+    }
+  }
+  
+  function openCategory(catId) {
+    state.activeCategoryId = catId;
+    renderCategories();
+    renderItems();
+    itemsPanel.classList.add('open');
+    const cat = state.categories.find(c => c.id === catId);
+    itemsTitle.textContent = cat ? cat.name : '';
+  }
+  
+  // ============ Рендер элементов ============
+  function renderItems() {
+    itemsList.innerHTML = '';
+    const cat = state.categories.find(c => c.id === state.activeCategoryId);
+    if (!cat) return;
+    
+    for (const item of cat.items) {
+      const card = document.createElement('div');
+      card.className = 'item-card' + (state.activeItems[cat.id] === item.id ? ' active' : '');
+      
+      if (item.img) {
+        const img = document.createElement('img');
+        img.src = item.src;
+        card.appendChild(img);
+      } else {
+        card.textContent = item.name;
+      }
+      
+      const del = document.createElement('div');
+      del.className = 'del-x';
+      del.textContent = '×';
+      del.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteItem(cat.id, item.id);
+      });
+      card.appendChild(del);
+      
+      card.addEventListener('click', () => {
+        // Toggle выбор
+        if (state.activeItems[cat.id] === item.id) {
+          delete state.activeItems[cat.id];
+        } else {
+          state.activeItems[cat.id] = item.id;
+        }
+        renderItems();
+        renderCanvas();
+      });
+      
+      itemsList.appendChild(card);
+    }
+    
+    // Кнопка добавления
+    const addBtn = document.createElement('div');
+    addBtn.className = 'item-card add-item-btn';
+    addBtn.textContent = '＋';
+    addBtn.addEventListener('click', () => {
+      openModalItem(cat.id);
+    });
+    itemsList.appendChild(addBtn);
+  }
+  
+  // ============ Управление категориями ============
+  function addCategory(name) {
+    const cat = { id: nextId(), name: name.trim() || 'Без названия', items: [] };
+    state.categories.push(cat);
+    renderCategories();
+    openCategory(cat.id);
+  }
+  
+  function deleteCategory(catId) {
+    if (!confirm('Удалить категорию и все её элементы?')) return;
+    state.categories = state.categories.filter(c => c.id !== catId);
+    delete state.activeItems[catId];
+    if (state.activeCategoryId === catId) {
+      state.activeCategoryId = state.categories[0]?.id || null;
+      if (state.activeCategoryId) {
+        openCategory(state.activeCategoryId);
+      } else {
+        itemsPanel.classList.remove('open');
+      }
+    }
+    renderCategories();
+    renderCanvas();
+  }
+  
+  // ============ Управление элементами ============
+  function addItem(catId, name, file) {
+    const cat = state.categories.find(c => c.id === catId);
+    if (!cat) return;
+    
+    if (!file) {
+      alert('Выберите изображение');
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const src = e.target.result;
+      const img = new Image();
+      img.onload = () => {
+        const item = {
+          id: nextId(),
+          name: name.trim() || 'Элемент',
+          src,
+          img,
+        };
+        cat.items.push(item);
+        // Автоматически активируем
+        state.activeItems[cat.id] = item.id;
+        renderItems();
+        renderCanvas();
+      };
+      img.onerror = () => alert('Не удалось загрузить изображение');
+      img.src = src;
+    };
+    reader.readAsDataURL(file);
+  }
+  
+  function deleteItem(catId, itemId) {
+    const cat = state.categories.find(c => c.id === catId);
+    if (!cat) return;
+    cat.items = cat.items.filter(i => i.id !== itemId);
+    if (state.activeItems[catId] === itemId) {
+      delete state.activeItems[catId];
+    }
+    renderItems();
+    renderCanvas();
+  }
+  
+  // ============ Модалки ============
+  const modalCat = document.getElementById('modal-cat');
+  const modalItem = document.getElementById('modal-item');
+  const catNameInput = document.getElementById('cat-name');
+  const itemNameInput = document.getElementById('item-name');
+  const itemFileInput = document.getElementById('item-file');
+  let pendingCatId = null;
+  
+  function openModalCat() {
+    catNameInput.value = '';
+    modalCat.classList.add('open');
+    setTimeout(() => catNameInput.focus(), 50);
+  }
+  
+  function openModalItem(catId) {
+    pendingCatId = catId;
+    itemNameInput.value = '';
+    itemFileInput.value = '';
+    modalItem.classList.add('open');
+  }
+  
+  function closeModals() {
+    modalCat.classList.remove('open');
+    modalItem.classList.remove('open');
+  }
+  
+  document.getElementById('btn-add-cat').addEventListener('click', openModalCat);
+  document.getElementById('cat-cancel').addEventListener('click', closeModals);
+  document.getElementById('cat-save').addEventListener('click', () => {
+    const name = catNameInput.value.trim();
+    if (!name) {
+      alert('Введите название');
+      return;
+    }
+    addCategory(name);
+    closeModals();
+  });
+  
+  document.getElementById('item-cancel').addEventListener('click', closeModals);
+  document.getElementById('item-save').addEventListener('click', () => {
+    const file = itemFileInput.files[0];
+    if (!file) {
+      alert('Выберите изображение');
+      return;
+    }
+    addItem(pendingCatId, itemNameInput.value, file);
+    closeModals();
+  });
+  
+  // Закрытие по фону
+  document.querySelectorAll('.modal-bg').forEach(bg => {
+    bg.addEventListener('click', (e) => {
+      if (e.target === bg) closeModals();
+    });
+  });
+  
+  // ============ Кнопки тулбара ============
+  document.getElementById('btn-close-items').addEventListener('click', () => {
+    itemsPanel.classList.remove('open');
+  });
+  
+  document.getElementById('btn-export').addEventListener('click', () => {
+    // Экспорт в PNG с метаданными DPI через pHYs chunk
+    const dataUrl = canvas.toDataURL('image/png');
+    
+    // Вставляем pHYs chunk для DPI 300
+    const dpi = DPI;
+    const ppm = Math.round(dpi / 0.0254); // пикселей на метр
+    const pngWithDpi = addPngPhysChunk(dataUrl, ppm);
+    
+    const link = document.createElement('a');
+    link.download = 'character_4096x4096_300dpi.png';
+    link.href = pngWithDpi;
+    link.click();
+  });
+  
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    if (!confirm('Сбросить все данные редактора?')) return;
+    state.categories = [];
+    state.activeItems = {};
+    state.activeCategoryId = null;
+    itemsPanel.classList.remove('open');
+    renderCategories();
+    renderCanvas();
+  });
+  
+  document.getElementById('zoom-in').addEventListener('click', () => setScale(state.scale * 1.25));
+  document.getElementById('zoom-out').addEventListener('click', () => setScale(state.scale * 0.8));
+  document.getElementById('zoom-fit').addEventListener('click', fitToScreen);
+  
+  // ============ DPI в PNG (pHYs chunk) ============
+  function addPngPhysChunk(dataUrl, ppm) {
+    // Декодируем base64
+    const base64 = dataUrl.split(',')[1];
+    const binary = atob(base64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+    
+    // PNG структура: signature(8) + chunks
+    // IHDR должен быть первым. pHYs можно вставить после IHDR.
+    const signature = bytes.slice(0, 8);
+    const ihdrEnd = 8 + 4 + 4 + 13 + 4; // len(4)+type(4)+data(13)+crc(4)
+    
+    // Создаём pHYs chunk: length=9, type="pHYs", data=ppx(4)+ppy(4)+unit(1), crc(4)
+    const physData = new Uint8Array(9);
+    const dv = new DataView(physData.buffer);
+    dv.setUint32(0, ppm, false);
+    dv.setUint32(4, ppm, false);
+    physData[8] = 1; // единица = метр
+    
+    const physType = new Uint8Array([0x70, 0x48, 0x59, 0x73]); // "pHYs"
+    const physLen = new Uint8Array([0, 0, 0, 9]);
+    
+    // CRC для pHYs
+    const crcInput = new Uint8Array(4 + 9);
+    crcInput.set(physType, 0);
+    crcInput.set(physData, 4);
+    const crc = crc32(crcInput);
+    const crcBytes = new Uint8Array(4);
+    new DataView(crcBytes.buffer).setUint32(0, crc, false);
+    
+    // Собираем новый PNG
+    const out = new Uint8Array(bytes.length + 4 + 4 + 9 + 4);
+    let off = 0;
+    out.set(signature, off); off += 8;
+    out.set(bytes.slice(8, ihdrEnd), off); off += (ihdrEnd - 8);
+    out.set(physLen, off); off += 4;
+    out.set(physType, off); off += 4;
+    out.set(physData, off); off += 9;
+    out.set(crcBytes, off); off += 4;
+    out.set(bytes.slice(ihdrEnd), off);
+    
+    // В base64
+    let bin = '';
+    const chunk = 0x8000;
+    for (let i = 0; i < out.length; i += chunk) {
+      bin += String.fromCharCode.apply(null, out.subarray(i, i + chunk));
+    }
+    return 'data:image/png;base64,' + btoa(bin);
+  }
+  
+  // CRC32
+  const crcTable = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) {
+        c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      }
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+  
+  function crc32(buf) {
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < buf.length; i++) {
+      c = crcTable[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+    }
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  
+  // ============ Инициализация ============
+  function init() {
+    // Демо-категории
+    addCategory('Тело');
+    addCategory('Глаза');
+    addCategory('Рот');
+    addCategory('Одежда');
+    
+    renderCategories();
+    renderCanvas();
+    
+    // Первая категория активна
+    if (state.categories.length > 0) {
+      state.activeCategoryId = state.categories[0].id;
+      renderCategories();
+    }
+    
+    // Подгонка под экран
+    requestAnimationFrame(() => {
+      fitToScreen();
+    });
+    
+    // Ресайз
+    window.addEventListener('resize', () => applyTransform());
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => applyTransform(), 300);
+    });
+  }
+  
+  init();
+})();
+</script>
+</body>
+</html>
     background:linear-gradient(135deg,#2a2a3a,#1a1a24);
     overflow:hidden; min-width:0;
   }
