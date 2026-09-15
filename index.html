@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Редактор персонажа</title>
 
-<!-- PWA -->
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#2a2a2a">
 <meta name="mobile-web-app-capable" content="yes">
@@ -13,7 +12,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Редактор">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
-<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
 
 <style>
   * {
@@ -21,8 +19,9 @@
     -webkit-tap-highlight-color: transparent;
     user-select: none;
     -webkit-user-select: none;
+    -webkit-touch-callout: none;
   }
-  
+
   html, body {
     margin: 0;
     padding: 0;
@@ -34,7 +33,9 @@
     touch-action: none;
     overscroll-behavior: none;
   }
-  
+
+  button, input, textarea { font-family: inherit; }
+
   #app {
     display: flex;
     flex-direction: column;
@@ -43,12 +44,12 @@
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
   }
-  
-  /* Верхняя панель */
+
+  /* ===== Верхняя панель ===== */
   #toolbar {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     padding: 8px;
     background: #2a2a2a;
     border-bottom: 1px solid #444;
@@ -56,15 +57,14 @@
     overflow-x: auto;
     scrollbar-width: none;
   }
-  
   #toolbar::-webkit-scrollbar { display: none; }
-  
+
   .btn {
     background: #3a3a3a;
     color: #fff;
     border: 1px solid #555;
     border-radius: 8px;
-    padding: 10px 14px;
+    padding: 10px 12px;
     font-size: 14px;
     cursor: pointer;
     white-space: nowrap;
@@ -73,25 +73,26 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.15s;
-    font-family: inherit;
+    transition: background 0.15s, transform 0.1s;
+    flex-shrink: 0;
   }
-  
-  .btn:active { background: #4a4a4a; }
+  .btn:active { background: #4a4a4a; transform: scale(0.96); }
   .btn.primary { background: #4a7cff; border-color: #4a7cff; }
   .btn.primary:active { background: #3a6cef; }
   .btn.danger { background: #c0392b; border-color: #c0392b; }
   .btn.danger:active { background: #a0291b; }
-  
-  /* Основная область */
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.icon-only { padding: 10px; font-size: 18px; }
+
+  /* ===== Основная область ===== */
   #main {
     flex: 1;
     display: flex;
     position: relative;
     overflow: hidden;
   }
-  
-  /* Холст */
+
+  /* ===== Холст ===== */
   #canvas-wrap {
     flex: 1;
     position: relative;
@@ -99,28 +100,139 @@
     background: #111;
     touch-action: none;
   }
-  
-  #canvas-container {
+
+  /* Шахматный фон для прозрачности */
+  #canvas-wrap.checker::before {
+    content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transform-origin: 0 0;
+    inset: 0;
+    background-image:
+      linear-gradient(45deg, #2a2a2a 25%, transparent 25%),
+      linear-gradient(-45deg, #2a2a2a 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #2a2a2a 75%),
+      linear-gradient(-45deg, transparent 75%, #2a2a2a 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    background-color: #1a1a1a;
+    pointer-events: none;
   }
-  
+
   #canvas {
     background: #fff;
     box-shadow: 0 0 40px rgba(0,0,0,0.6);
-    image-rendering: auto;
     position: absolute;
     will-change: transform, width, height;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
   }
-  
-  /* Нижняя панель с категориями */
+
+  /* Сетка */
+  #grid-overlay {
+    position: absolute;
+    pointer-events: none;
+    display: none;
+    background-image:
+      linear-gradient(to right, rgba(74,124,255,0.3) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(74,124,255,0.3) 1px, transparent 1px);
+    background-size: 25% 25%;
+    border: 1px solid rgba(74,124,255,0.5);
+  }
+  #grid-overlay.show { display: block; }
+
+  /* Центр-маркер */
+  #center-marker {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    pointer-events: none;
+    display: none;
+    z-index: 6;
+  }
+  #center-marker.show { display: block; }
+  #center-marker::before,
+  #center-marker::after {
+    content: '';
+    position: absolute;
+    background: rgba(74,124,255,0.9);
+  }
+  #center-marker::before {
+    left: 50%; top: 0; width: 1px; height: 100%;
+    transform: translateX(-0.5px);
+  }
+  #center-marker::after {
+    top: 50%; left: 0; width: 100%; height: 1px;
+    transform: translateY(-0.5px);
+  }
+
+  /* Кнопки зума */
+  #zoom-controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 5;
+  }
+  #zoom-controls .btn {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    font-size: 20px;
+    background: rgba(50,50,50,0.85);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-radius: 22px;
+  }
+
+  /* Инфо-панель холста */
+  #zoom-info {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(0,0,0,0.6);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    color: #aaa;
+    z-index: 5;
+    pointer-events: none;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Быстрые инструменты холста */
+  #canvas-tools {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 4px;
+    background: rgba(50,50,50,0.85);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-radius: 22px;
+    padding: 4px;
+    z-index: 5;
+  }
+  #canvas-tools .btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    font-size: 16px;
+    background: transparent;
+    border: none;
+    border-radius: 18px;
+    min-height: 36px;
+    min-width: 36px;
+  }
+  #canvas-tools .btn.active {
+    background: #4a7cff;
+  }
+
+  /* ===== Нижняя панель категорий ===== */
   #categories {
     display: flex;
     align-items: center;
@@ -133,9 +245,8 @@
     flex-shrink: 0;
     min-height: 60px;
   }
-  
   #categories::-webkit-scrollbar { display: none; }
-  
+
   .cat-tab {
     background: #3a3a3a;
     color: #fff;
@@ -150,27 +261,30 @@
     display: flex;
     align-items: center;
     position: relative;
+    gap: 6px;
   }
-  
   .cat-tab.active {
     background: #4a7cff;
     border-color: #4a7cff;
   }
-  
-  .cat-tab .del-x {
-    margin-left: 8px;
-    width: 20px;
-    height: 20px;
+  .cat-tab .del-x,
+  .cat-tab .visibility-btn {
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
     background: rgba(0,0,0,0.3);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1;
   }
-  
-  /* Панель элементов */
+  .cat-tab .visibility-btn.off {
+    background: rgba(255,255,255,0.15);
+    color: #888;
+  }
+
+  /* ===== Панель элементов ===== */
   #items-panel {
     position: absolute;
     bottom: 70px;
@@ -178,35 +292,36 @@
     right: 0;
     background: #242424;
     border-top: 1px solid #444;
-    max-height: 40vh;
+    max-height: 45vh;
     display: none;
     flex-direction: column;
     z-index: 10;
     border-radius: 12px 12px 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
   }
-  
   #items-panel.open { display: flex; }
-  
+
   #items-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 8px 12px;
     border-bottom: 1px solid #444;
+    gap: 8px;
   }
-  
   #items-header span { font-size: 14px; font-weight: 500; }
-  
+  #items-header .header-actions { display: flex; gap: 6px; }
+
   #items-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
     gap: 8px;
     padding: 10px;
     overflow-y: auto;
-    max-height: 35vh;
+    max-height: 38vh;
     -webkit-overflow-scrolling: touch;
   }
-  
+
   .item-card {
     background: #333;
     border: 2px solid #444;
@@ -223,19 +338,16 @@
     text-align: center;
     color: #ccc;
   }
-  
   .item-card.active {
     border-color: #4a7cff;
     box-shadow: 0 0 8px rgba(74,124,255,0.5);
   }
-  
   .item-card img {
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
     pointer-events: none;
   }
-  
   .item-card .del-x {
     position: absolute;
     top: 2px;
@@ -251,54 +363,18 @@
     font-size: 13px;
     z-index: 2;
   }
-  
   .add-item-btn {
     background: #2a2a2a;
     border: 2px dashed #555;
     color: #888;
     font-size: 28px;
   }
-  
-  /* Верхние кнопки зума */
-  #zoom-controls {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    z-index: 5;
-  }
-  
-  #zoom-controls .btn {
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    font-size: 20px;
-    background: rgba(50,50,50,0.85);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    border-radius: 22px;
-  }
-  
-  #zoom-info {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    background: rgba(0,0,0,0.6);
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 11px;
-    color: #aaa;
-    z-index: 5;
-    pointer-events: none;
-  }
-  
-  /* Модалка */
+
+  /* ===== Модалки ===== */
   .modal-bg {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.7);
+    background: rgba(0,0,0,0.75);
     display: none;
     align-items: center;
     justify-content: center;
@@ -306,23 +382,23 @@
     padding: 20px;
     padding-top: calc(20px + env(safe-area-inset-top));
     padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
   }
-  
   .modal-bg.open { display: flex; }
-  
+
   .modal {
     background: #2a2a2a;
     border-radius: 12px;
     padding: 20px;
     width: 100%;
-    max-width: 400px;
-    max-height: 80vh;
+    max-width: 440px;
+    max-height: 85vh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
-  
+
   .modal h3 { margin: 0 0 15px; font-size: 16px; }
-  
   .modal label {
     display: block;
     font-size: 13px;
@@ -330,9 +406,9 @@
     margin-bottom: 6px;
     margin-top: 12px;
   }
-  
   .modal input[type="text"],
   .modal input[type="number"],
+  .modal select,
   .modal textarea {
     width: 100%;
     background: #1a1a1a;
@@ -343,29 +419,211 @@
     font-size: 14px;
     font-family: inherit;
   }
-  
   .modal input[type="file"] {
     width: 100%;
     color: #ccc;
     font-size: 13px;
     padding: 8px 0;
   }
-  
   .modal-actions {
     display: flex;
     gap: 8px;
     margin-top: 20px;
   }
-  
   .modal-actions .btn { flex: 1; }
-  
-  .hint {
-    font-size: 11px;
-    color: #888;
-    margin-top: 6px;
+  .hint { font-size: 11px; color: #888; margin-top: 6px; }
+
+  /* ===== Галерея ===== */
+  #gallery-modal .modal { max-width: 700px; }
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
   }
-  
-  /* Баннер обновления PWA */
+  .gallery-card {
+    background: #333;
+    border: 2px solid #444;
+    border-radius: 10px;
+    padding: 8px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .gallery-card.active {
+    border-color: #4a7cff;
+  }
+  .gallery-card .thumb {
+    aspect-ratio: 1;
+    background: #fff;
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .gallery-card .thumb img {
+    width: 100%; height: 100%; object-fit: contain;
+  }
+  .gallery-card .title {
+    font-size: 12px;
+    color: #ddd;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .gallery-card .meta {
+    font-size: 10px;
+    color: #888;
+    text-align: center;
+  }
+  .gallery-card .actions {
+    display: flex;
+    gap: 4px;
+  }
+  .gallery-card .actions .btn {
+    flex: 1;
+    padding: 6px;
+    min-height: 32px;
+    min-width: 0;
+    font-size: 12px;
+  }
+
+  /* ===== Слои (drag-and-drop) ===== */
+  .layer-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #333;
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    touch-action: none;
+  }
+  .layer-row.dragging { opacity: 0.5; }
+  .layer-row.drag-over { border-top: 2px solid #4a7cff; }
+  .layer-row .handle {
+    cursor: grab;
+    color: #888;
+    font-size: 18px;
+    padding: 4px;
+  }
+  .layer-row .layer-name { flex: 1; font-size: 14px; }
+  .layer-row .layer-actions { display: flex; gap: 4px; }
+  .layer-row .btn {
+    padding: 6px;
+    min-height: 32px;
+    min-width: 32px;
+    font-size: 14px;
+  }
+
+  /* ===== Пресеты экспорта ===== */
+  .export-presets {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .export-preset {
+    background: #333;
+    border: 2px solid #444;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .export-preset.active {
+    border-color: #4a7cff;
+    background: #2a3a5a;
+  }
+
+  /* ===== Тосты ===== */
+  #toasts {
+    position: fixed;
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 300;
+    pointer-events: none;
+    max-width: 90vw;
+  }
+  .toast {
+    background: rgba(50,50,50,0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    animation: toast-in 0.25s ease;
+    white-space: nowrap;
+  }
+  .toast.success { background: rgba(46,160,67,0.95); }
+  .toast.error { background: rgba(192,57,43,0.95); }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ===== Прогресс-бар ===== */
+  #progress-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 400;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  #progress-overlay.show { display: flex; }
+  #progress-box {
+    background: #2a2a2a;
+    padding: 24px 32px;
+    border-radius: 12px;
+    text-align: center;
+    min-width: 240px;
+  }
+  #progress-box .label { font-size: 14px; margin-bottom: 12px; }
+  #progress-box .bar {
+    height: 6px;
+    background: #1a1a1a;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  #progress-box .fill {
+    height: 100%;
+    background: #4a7cff;
+    width: 0%;
+    transition: width 0.2s;
+  }
+
+  /* ===== Индикатор сохранения ===== */
+  #save-indicator {
+    position: fixed;
+    top: calc(8px + env(safe-area-inset-top));
+    right: 8px;
+    background: rgba(46,160,67,0.9);
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    z-index: 250;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  #save-indicator.show { opacity: 1; }
+
+  /* ===== Офлайн / обновление ===== */
   #update-banner {
     position: fixed;
     bottom: calc(80px + env(safe-area-inset-bottom));
@@ -383,9 +641,7 @@
     z-index: 200;
     box-shadow: 0 4px 20px rgba(0,0,0,0.4);
   }
-  
   #update-banner.show { display: flex; }
-  
   #update-banner .btn {
     background: rgba(255,255,255,0.2);
     border: none;
@@ -394,8 +650,7 @@
     min-height: 36px;
     min-width: auto;
   }
-  
-  /* Индикатор офлайн */
+
   #offline-badge {
     position: fixed;
     top: calc(10px + env(safe-area-inset-top));
@@ -409,10 +664,8 @@
     z-index: 200;
     display: none;
   }
-  
   #offline-badge.show { display: block; }
-  
-  /* Экран установки PWA */
+
   #install-prompt {
     position: fixed;
     bottom: calc(20px + env(safe-area-inset-bottom));
@@ -428,83 +681,204 @@
     z-index: 200;
     box-shadow: 0 4px 20px rgba(0,0,0,0.5);
   }
-  
   #install-prompt.show { display: flex; }
-  
-  #install-prompt .icon {
-    font-size: 28px;
-    flex-shrink: 0;
-  }
-  
-  #install-prompt .text {
-    flex: 1;
-    font-size: 12px;
-    line-height: 1.4;
-  }
-  
-  #install-prompt .text strong {
-    display: block;
-    font-size: 13px;
-    margin-bottom: 2px;
-  }
-  
-  #install-prompt .actions {
-    display: flex;
-    gap: 6px;
-    flex-shrink: 0;
-  }
-  
+  #install-prompt .icon { font-size: 28px; flex-shrink: 0; }
+  #install-prompt .text { flex: 1; font-size: 12px; line-height: 1.4; }
+  #install-prompt .text strong { display: block; font-size: 13px; margin-bottom: 2px; }
+  #install-prompt .actions { display: flex; gap: 6px; flex-shrink: 0; }
   #install-prompt .btn {
     padding: 8px 12px;
     min-height: 36px;
     min-width: auto;
     font-size: 12px;
   }
+
+  /* ===== Undo/Redo flash ===== */
+  @keyframes flash {
+    0%, 100% { background: #3a3a3a; }
+    50% { background: #4a7cff; }
+  }
+  .btn.flash { animation: flash 0.3s ease; }
 </style>
 </head>
 <body>
 <div id="app">
+  <!-- Верхняя панель -->
   <div id="toolbar">
-    <button class="btn" id="btn-export">💾 Экспорт</button>
-    <button class="btn" id="btn-add-cat">➕ Категория</button>
-    <button class="btn" id="btn-reset">🔄 Сброс</button>
+    <button class="btn icon-only" id="btn-undo" title="Отменить">↶</button>
+    <button class="btn icon-only" id="btn-redo" title="Повторить">↷</button>
+    <button class="btn" id="btn-gallery">🖼️ Галерея</button>
+    <button class="btn" id="btn-layers">📚 Слои</button>
+    <button class="btn" id="btn-add-cat">➕</button>
+    <button class="btn primary" id="btn-export">💾</button>
+    <button class="btn" id="btn-import">📥</button>
+    <button class="btn" id="btn-new">✨</button>
   </div>
-  
+
+  <!-- Основная область -->
   <div id="main">
     <div id="canvas-wrap">
-      <div id="canvas-container">
-        <canvas id="canvas" width="4096" height="4096"></canvas>
+      <canvas id="canvas" width="4096" height="4096"></canvas>
+      <div id="grid-overlay"></div>
+      <div id="center-marker"></div>
+      <div id="zoom-info">4096×4096 · 300 DPI · 100%</div>
+      <div id="canvas-tools">
+        <button class="btn" id="tool-grid" title="Сетка">⊞</button>
+        <button class="btn" id="tool-checker" title="Прозрачность">▦</button>
+        <button class="btn" id="tool-center" title="Центр">⊕</button>
       </div>
-      <div id="zoom-info">4096 × 4096 · 300 DPI · Масштаб 100%</div>
       <div id="zoom-controls">
         <button class="btn" id="zoom-in">＋</button>
         <button class="btn" id="zoom-out">－</button>
-        <button class="btn" id="zoom-fit" title="Вписать">⤢</button>
+        <button class="btn" id="zoom-100" title="100%">1:1</button>
+        <button class="btn" id="zoom-fit">⤢</button>
       </div>
     </div>
   </div>
-  
+
+  <!-- Панель элементов -->
   <div id="items-panel">
     <div id="items-header">
       <span id="items-title">Категория</span>
-      <button class="btn" id="btn-close-items" style="min-height:32px;padding:6px 12px;font-size:13px;">Закрыть</button>
+      <div class="header-actions">
+        <button class="btn" id="btn-close-items" style="min-height:32px;padding:6px 12px;font-size:13px;">Закрыть</button>
+      </div>
     </div>
     <div id="items-list"></div>
   </div>
-  
+
+  <!-- Категории -->
   <div id="categories"></div>
 </div>
 
-<!-- Баннер обновления -->
+<!-- ===== Модалка: новая категория ===== -->
+<div class="modal-bg" id="modal-cat">
+  <div class="modal">
+    <h3>Новая категория</h3>
+    <label>Название</label>
+    <input type="text" id="cat-name" placeholder="Например: Глаза">
+    <div class="modal-actions">
+      <button class="btn" data-close>Отмена</button>
+      <button class="btn primary" id="cat-save">Добавить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Модалка: новый элемент ===== -->
+<div class="modal-bg" id="modal-item">
+  <div class="modal">
+    <h3>Добавить элемент</h3>
+    <label>Название</label>
+    <input type="text" id="item-name" placeholder="Например: Круглые глаза">
+    <label>Изображение (PNG с прозрачностью)</label>
+    <input type="file" id="item-file" accept="image/*" multiple>
+    <div class="hint">Можно выбрать несколько сразу. Рекомендуется PNG 4096×4096.</div>
+    <div class="modal-actions">
+      <button class="btn" data-close>Отмена</button>
+      <button class="btn primary" id="item-save">Добавить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Модалка: слои ===== -->
+<div class="modal-bg" id="modal-layers">
+  <div class="modal">
+    <h3>Слои (порядок отрисовки)</h3>
+    <div class="hint" style="margin-bottom:12px;">
+      Перетащите за ⠿ для изменения порядка. Верхний = рисуется последним.
+    </div>
+    <div id="layers-list"></div>
+    <div class="modal-actions">
+      <button class="btn primary" data-close>Готово</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Модалка: галерея ===== -->
+<div class="modal-bg" id="gallery-modal">
+  <div class="modal">
+    <h3>Мои персонажи</h3>
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <button class="btn primary" id="gallery-new" style="flex:1;">＋ Новый</button>
+      <button class="btn" id="gallery-import" style="flex:1;">📥 Импорт</button>
+    </div>
+    <div class="gallery-grid" id="gallery-grid"></div>
+    <div class="modal-actions">
+      <button class="btn" data-close>Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Модалка: экспорт ===== -->
+<div class="modal-bg" id="modal-export">
+  <div class="modal">
+    <h3>Экспорт</h3>
+    <label>Формат</label>
+    <div class="export-presets" id="export-format-presets">
+      <div class="export-preset active" data-format="png">PNG</div>
+      <div class="export-preset" data-format="psd">PSD</div>
+      <div class="export-preset" data-format="json">JSON</div>
+    </div>
+    <div id="export-png-opts">
+      <label>Размер</label>
+      <div class="export-presets" id="export-size-presets">
+        <div class="export-preset" data-size="512">512</div>
+        <div class="export-preset" data-size="1024">1024</div>
+        <div class="export-preset" data-size="2048">2048</div>
+        <div class="export-preset active" data-size="4096">4096</div>
+      </div>
+      <label><input type="checkbox" id="export-transparent"> Прозрачный фон</label>
+    </div>
+    <div id="export-psd-opts" style="display:none;">
+      <div class="hint">
+        Каждая категория будет отдельным слоем в PSD.
+        Файл совместим с Photoshop, GIMP, Krita, Procreate.
+      </div>
+    </div>
+    <div id="export-json-opts" style="display:none;">
+      <div class="hint">
+        JSON содержит все категории, элементы и настройки.
+        Можно передать другому пользователю.
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" data-close>Отмена</button>
+      <button class="btn primary" id="export-confirm">Экспортировать</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Модалка: импорт ===== -->
+<div class="modal-bg" id="modal-import">
+  <div class="modal">
+    <h3>Импорт проекта</h3>
+    <label>Выберите .json файл</label>
+    <input type="file" id="import-file" accept="application/json,.json">
+    <div class="hint">Проект будет добавлен в галерею.</div>
+    <div class="modal-actions">
+      <button class="btn" data-close>Отмена</button>
+      <button class="btn primary" id="import-confirm">Импортировать</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Индикаторы ===== -->
+<div id="toasts"></div>
+<div id="save-indicator">💾 Сохранено</div>
+
+<div id="progress-overlay">
+  <div id="progress-box">
+    <div class="label" id="progress-label">Обработка…</div>
+    <div class="bar"><div class="fill" id="progress-fill"></div></div>
+  </div>
+</div>
+
 <div id="update-banner">
   <span>Доступна новая версия</span>
   <button class="btn" id="btn-update">Обновить</button>
 </div>
-
-<!-- Индикатор офлайн -->
 <div id="offline-badge">📴 Офлайн-режим</div>
 
-<!-- Баннер установки -->
 <div id="install-prompt">
   <div class="icon">📱</div>
   <div class="text">
@@ -517,709 +891,12 @@
   </div>
 </div>
 
-<!-- Модалка добавления категории -->
-<div class="modal-bg" id="modal-cat">
-  <div class="modal">
-    <h3>Новая категория</h3>
-    <label>Название</label>
-    <input type="text" id="cat-name" placeholder="Например: Глаза">
-    <div class="modal-actions">
-      <button class="btn" id="cat-cancel">Отмена</button>
-      <button class="btn primary" id="cat-save">Добавить</button>
-    </div>
-  </div>
-</div>
-
-<!-- Модалка добавления элемента -->
-<div class="modal-bg" id="modal-item">
-  <div class="modal">
-    <h3>Добавить элемент</h3>
-    <label>Название</label>
-    <input type="text" id="item-name" placeholder="Например: Круглые глаза">
-    <label>Изображение (PNG с прозрачностью)</label>
-    <input type="file" id="item-file" accept="image/*">
-    <div class="hint">Рекомендуется PNG 4096×4096 с прозрачным фоном</div>
-    <div class="modal-actions">
-      <button class="btn" id="item-cancel">Отмена</button>
-      <button class="btn primary" id="item-save">Добавить</button>
-    </div>
-  </div>
-</div>
-
-<script>
-(function() {
-  'use strict';
-  
-  // ============ Константы ============
-  const CANVAS_SIZE = 4096;
-  const DPI = 300;
-  
-  // ============ Состояние ============
-  const state = {
-    categories: [],
-    activeCategoryId: null,
-    activeItems: {},
-    scale: 1,
-    offsetX: 0,
-    offsetY: 0,
-    minScale: 0.05,
-    maxScale: 4,
-  };
-  
-  let uid = 1;
-  const nextId = () => 'id_' + (uid++);
-  
-  // ============ DOM ============
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  const canvasWrap = document.getElementById('canvas-wrap');
-  const categoriesEl = document.getElementById('categories');
-  const itemsPanel = document.getElementById('items-panel');
-  const itemsList = document.getElementById('items-list');
-  const itemsTitle = document.getElementById('items-title');
-  const zoomInfo = document.getElementById('zoom-info');
-  
-  // ============ Рендер холста ============
-  function renderCanvas() {
-    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    
-    for (const cat of state.categories) {
-      const activeItemId = state.activeItems[cat.id];
-      if (!activeItemId) continue;
-      const item = cat.items.find(i => i.id === activeItemId);
-      if (item && item.img) {
-        try {
-          ctx.drawImage(item.img, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
-        } catch(e) {
-          console.warn('Ошибка отрисовки', e);
-        }
-      }
-    }
-  }
-  
-  // ============ Трансформация холста ============
-  function applyTransform() {
-    const w = canvasWrap.clientWidth;
-    const h = canvasWrap.clientHeight;
-    const scaledW = CANVAS_SIZE * state.scale;
-    const scaledH = CANVAS_SIZE * state.scale;
-    
-    const x = (w - scaledW) / 2 + state.offsetX;
-    const y = (h - scaledH) / 2 + state.offsetY;
-    
-    canvas.style.width = scaledW + 'px';
-    canvas.style.height = scaledH + 'px';
-    canvas.style.left = x + 'px';
-    canvas.style.top = y + 'px';
-    
-    zoomInfo.textContent = `4096 × 4096 · 300 DPI · Масштаб ${Math.round(state.scale * 100)}%`;
-  }
-  
-  function setScale(newScale, centerX, centerY) {
-    newScale = Math.max(state.minScale, Math.min(state.maxScale, newScale));
-    if (centerX === undefined) centerX = canvasWrap.clientWidth / 2;
-    if (centerY === undefined) centerY = canvasWrap.clientHeight / 2;
-    
-    const oldScale = state.scale;
-    const ratio = newScale / oldScale;
-    
-    state.offsetX = (state.offsetX - (centerX - canvasWrap.clientWidth/2)) * ratio + (centerX - canvasWrap.clientWidth/2);
-    state.offsetY = (state.offsetY - (centerY - canvasWrap.clientHeight/2)) * ratio + (centerY - canvasWrap.clientHeight/2);
-    state.scale = newScale;
-    applyTransform();
-  }
-  
-  function fitToScreen() {
-    const w = canvasWrap.clientWidth;
-    const h = canvasWrap.clientHeight;
-    const pad = 40;
-    const s = Math.min((w - pad) / CANVAS_SIZE, (h - pad) / CANVAS_SIZE);
-    state.scale = s;
-    state.offsetX = 0;
-    state.offsetY = 0;
-    applyTransform();
-  }
-  
-  // ============ Жесты ============
-  let touches = {};
-  let lastDist = 0;
-  let lastMid = { x: 0, y: 0 };
-  let isPanning = false;
-  let panStart = { x: 0, y: 0 };
-  
-  canvasWrap.addEventListener('touchstart', (e) => {
-    const rect = canvasWrap.getBoundingClientRect();
-    for (const t of e.changedTouches) {
-      touches[t.identifier] = {
-        x: t.clientX - rect.left,
-        y: t.clientY - rect.top,
-      };
-    }
-    
-    const ids = Object.keys(touches);
-    if (ids.length === 1) {
-      isPanning = true;
-      panStart = {
-        x: touches[ids[0]].x,
-        y: touches[ids[0]].y,
-        offsetX: state.offsetX,
-        offsetY: state.offsetY,
-      };
-    } else if (ids.length === 2) {
-      isPanning = false;
-      const [a, b] = ids.map(id => touches[id]);
-      lastDist = Math.hypot(a.x - b.x, a.y - b.y);
-      lastMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-    }
-  }, { passive: false });
-  
-  canvasWrap.addEventListener('touchmove', (e) => {
-    e.preventDefault();
-    const rect = canvasWrap.getBoundingClientRect();
-    for (const t of e.changedTouches) {
-      if (touches[t.identifier]) {
-        touches[t.identifier].x = t.clientX - rect.left;
-        touches[t.identifier].y = t.clientY - rect.top;
-      }
-    }
-    
-    const ids = Object.keys(touches);
-    if (ids.length === 1 && isPanning) {
-      const t = touches[ids[0]];
-      state.offsetX = panStart.offsetX + (t.x - panStart.x);
-      state.offsetY = panStart.offsetY + (t.y - panStart.y);
-      applyTransform();
-    } else if (ids.length === 2) {
-      const [a, b] = ids.map(id => touches[id]);
-      const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      
-      if (lastDist > 0) {
-        const newScale = state.scale * (dist / lastDist);
-        setScale(newScale, mid.x, mid.y);
-        state.offsetX += mid.x - lastMid.x;
-        state.offsetY += mid.y - lastMid.y;
-        applyTransform();
-      }
-      lastDist = dist;
-      lastMid = mid;
-    }
-  }, { passive: false });
-  
-  const endTouch = (e) => {
-    for (const t of e.changedTouches) {
-      delete touches[t.identifier];
-    }
-    const ids = Object.keys(touches);
-    if (ids.length === 0) {
-      isPanning = false;
-      lastDist = 0;
-    } else if (ids.length === 1) {
-      isPanning = true;
-      const t = touches[ids[0]];
-      panStart = {
-        x: t.x,
-        y: t.y,
-        offsetX: state.offsetX,
-        offsetY: state.offsetY,
-      };
-      lastDist = 0;
-    }
-  };
-  
-  canvasWrap.addEventListener('touchend', endTouch, { passive: false });
-  canvasWrap.addEventListener('touchcancel', endTouch, { passive: false });
-  
-  // Мышь
-  let mouseDown = false;
-  let mouseStart = { x: 0, y: 0 };
-  let mouseOffsetStart = { x: 0, y: 0 };
-  
-  canvasWrap.addEventListener('mousedown', (e) => {
-    mouseDown = true;
-    mouseStart = { x: e.clientX, y: e.clientY };
-    mouseOffsetStart = { x: state.offsetX, y: state.offsetY };
-  });
-  
-  window.addEventListener('mousemove', (e) => {
-    if (!mouseDown) return;
-    state.offsetX = mouseOffsetStart.x + (e.clientX - mouseStart.x);
-    state.offsetY = mouseOffsetStart.y + (e.clientY - mouseStart.y);
-    applyTransform();
-  });
-  
-  window.addEventListener('mouseup', () => { mouseDown = false; });
-  
-  canvasWrap.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const rect = canvasWrap.getBoundingClientRect();
-    const cx = e.clientX - rect.left;
-    const cy = e.clientY - rect.top;
-    const factor = e.deltaY < 0 ? 1.1 : 0.9;
-    setScale(state.scale * factor, cx, cy);
-  }, { passive: false });
-  
-  // ============ Категории ============
-  function renderCategories() {
-    categoriesEl.innerHTML = '';
-    for (const cat of state.categories) {
-      const tab = document.createElement('div');
-      tab.className = 'cat-tab' + (cat.id === state.activeCategoryId ? ' active' : '');
-      
-      const name = document.createElement('span');
-      name.textContent = cat.name;
-      tab.appendChild(name);
-      
-      const del = document.createElement('div');
-      del.className = 'del-x';
-      del.textContent = '×';
-      del.addEventListener('click', (e) => {
-        e.stopPropagation();
-        deleteCategory(cat.id);
-      });
-      tab.appendChild(del);
-      
-      tab.addEventListener('click', () => openCategory(cat.id));
-      categoriesEl.appendChild(tab);
-    }
-  }
-  
-  function openCategory(catId) {
-    state.activeCategoryId = catId;
-    renderCategories();
-    renderItems();
-    itemsPanel.classList.add('open');
-    const cat = state.categories.find(c => c.id === catId);
-    itemsTitle.textContent = cat ? cat.name : '';
-  }
-  
-  // ============ Элементы ============
-  function renderItems() {
-    itemsList.innerHTML = '';
-    const cat = state.categories.find(c => c.id === state.activeCategoryId);
-    if (!cat) return;
-    
-    for (const item of cat.items) {
-      const card = document.createElement('div');
-      card.className = 'item-card' + (state.activeItems[cat.id] === item.id ? ' active' : '');
-      
-      if (item.img) {
-        const img = document.createElement('img');
-        img.src = item.src;
-        img.alt = item.name;
-        card.appendChild(img);
-      } else {
-        card.textContent = item.name;
-      }
-      
-      const del = document.createElement('div');
-      del.className = 'del-x';
-      del.textContent = '×';
-      del.addEventListener('click', (e) => {
-        e.stopPropagation();
-        deleteItem(cat.id, item.id);
-      });
-      card.appendChild(del);
-      
-      card.addEventListener('click', () => {
-        if (state.activeItems[cat.id] === item.id) {
-          delete state.activeItems[cat.id];
-        } else {
-          state.activeItems[cat.id] = item.id;
-        }
-        renderItems();
-        renderCanvas();
-      });
-      
-      itemsList.appendChild(card);
-    }
-    
-    const addBtn = document.createElement('div');
-    addBtn.className = 'item-card add-item-btn';
-    addBtn.textContent = '＋';
-    addBtn.addEventListener('click', () => openModalItem(cat.id));
-    itemsList.appendChild(addBtn);
-  }
-  
-  function addCategory(name) {
-    const cat = { id: nextId(), name: name.trim() || 'Без названия', items: [] };
-    state.categories.push(cat);
-    renderCategories();
-    openCategory(cat.id);
-  }
-  
-  function deleteCategory(catId) {
-    if (!confirm('Удалить категорию и все её элементы?')) return;
-    state.categories = state.categories.filter(c => c.id !== catId);
-    delete state.activeItems[catId];
-    if (state.activeCategoryId === catId) {
-      state.activeCategoryId = state.categories[0]?.id || null;
-      if (state.activeCategoryId) {
-        openCategory(state.activeCategoryId);
-      } else {
-        itemsPanel.classList.remove('open');
-      }
-    }
-    renderCategories();
-    renderCanvas();
-  }
-  
-  function addItem(catId, name, file) {
-    const cat = state.categories.find(c => c.id === catId);
-    if (!cat) return;
-    
-    if (!file) {
-      alert('Выберите изображение');
-      return;
-    }
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const src = e.target.result;
-      const img = new Image();
-      img.onload = () => {
-        const item = {
-          id: nextId(),
-          name: name.trim() || 'Элемент',
-          src,
-          img,
-        };
-        cat.items.push(item);
-        state.activeItems[cat.id] = item.id;
-        renderItems();
-        renderCanvas();
-      };
-      img.onerror = () => alert('Не удалось загрузить изображение');
-      img.src = src;
-    };
-    reader.readAsDataURL(file);
-  }
-  
-  function deleteItem(catId, itemId) {
-    const cat = state.categories.find(c => c.id === catId);
-    if (!cat) return;
-    cat.items = cat.items.filter(i => i.id !== itemId);
-    if (state.activeItems[catId] === itemId) {
-      delete state.activeItems[catId];
-    }
-    renderItems();
-    renderCanvas();
-  }
-  
-  // ============ Модалки ============
-  const modalCat = document.getElementById('modal-cat');
-  const modalItem = document.getElementById('modal-item');
-  const catNameInput = document.getElementById('cat-name');
-  const itemNameInput = document.getElementById('item-name');
-  const itemFileInput = document.getElementById('item-file');
-  let pendingCatId = null;
-  
-  function openModalCat() {
-    catNameInput.value = '';
-    modalCat.classList.add('open');
-    setTimeout(() => catNameInput.focus(), 50);
-  }
-  
-  function openModalItem(catId) {
-    pendingCatId = catId;
-    itemNameInput.value = '';
-    itemFileInput.value = '';
-    modalItem.classList.add('open');
-  }
-  
-  function closeModals() {
-    modalCat.classList.remove('open');
-    modalItem.classList.remove('open');
-  }
-  
-  document.getElementById('btn-add-cat').addEventListener('click', openModalCat);
-  document.getElementById('cat-cancel').addEventListener('click', closeModals);
-  document.getElementById('cat-save').addEventListener('click', () => {
-    const name = catNameInput.value.trim();
-    if (!name) {
-      alert('Введите название');
-      return;
-    }
-    addCategory(name);
-    closeModals();
-  });
-  
-  document.getElementById('item-cancel').addEventListener('click', closeModals);
-  document.getElementById('item-save').addEventListener('click', () => {
-    const file = itemFileInput.files[0];
-    if (!file) {
-      alert('Выберите изображение');
-      return;
-    }
-    addItem(pendingCatId, itemNameInput.value, file);
-    closeModals();
-  });
-  
-  document.querySelectorAll('.modal-bg').forEach(bg => {
-    bg.addEventListener('click', (e) => {
-      if (e.target === bg) closeModals();
-    });
-  });
-  
-  // ============ Тулбар ============
-  document.getElementById('btn-close-items').addEventListener('click', () => {
-    itemsPanel.classList.remove('open');
-  });
-  
-  document.getElementById('btn-export').addEventListener('click', () => {
-    const dataUrl = canvas.toDataURL('image/png');
-    const ppm = Math.round(DPI / 0.0254);
-    const pngWithDpi = addPngPhysChunk(dataUrl, ppm);
-    
-    const link = document.createElement('a');
-    link.download = 'character_4096x4096_300dpi.png';
-    link.href = pngWithDpi;
-    link.click();
-  });
-  
-  document.getElementById('btn-reset').addEventListener('click', () => {
-    if (!confirm('Сбросить все данные редактора?')) return;
-    state.categories = [];
-    state.activeItems = {};
-    state.activeCategoryId = null;
-    itemsPanel.classList.remove('open');
-    renderCategories();
-    renderCanvas();
-  });
-  
-  document.getElementById('zoom-in').addEventListener('click', () => setScale(state.scale * 1.25));
-  document.getElementById('zoom-out').addEventListener('click', () => setScale(state.scale * 0.8));
-  document.getElementById('zoom-fit').addEventListener('click', fitToScreen);
-  
-  // ============ DPI в PNG ============
-  function addPngPhysChunk(dataUrl, ppm) {
-    const base64 = dataUrl.split(',')[1];
-    const binary = atob(base64);
-    const len = binary.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
-    
-    const signature = bytes.slice(0, 8);
-    const ihdrEnd = 8 + 4 + 4 + 13 + 4;
-    
-    const physData = new Uint8Array(9);
-    const dv = new DataView(physData.buffer);
-    dv.setUint32(0, ppm, false);
-    dv.setUint32(4, ppm, false);
-    physData[8] = 1;
-    
-    const physType = new Uint8Array([0x70, 0x48, 0x59, 0x73]);
-    const physLen = new Uint8Array([0, 0, 0, 9]);
-    
-    const crcInput = new Uint8Array(4 + 9);
-    crcInput.set(physType, 0);
-    crcInput.set(physData, 4);
-    const crc = crc32(crcInput);
-    const crcBytes = new Uint8Array(4);
-    new DataView(crcBytes.buffer).setUint32(0, crc, false);
-    
-    const out = new Uint8Array(bytes.length + 4 + 4 + 9 + 4);
-    let off = 0;
-    out.set(signature, off); off += 8;
-    out.set(bytes.slice(8, ihdrEnd), off); off += (ihdrEnd - 8);
-    out.set(physLen, off); off += 4;
-    out.set(physType, off); off += 4;
-    out.set(physData, off); off += 9;
-    out.set(crcBytes, off); off += 4;
-    out.set(bytes.slice(ihdrEnd), off);
-    
-    let bin = '';
-    const chunk = 0x8000;
-    for (let i = 0; i < out.length; i += chunk) {
-      bin += String.fromCharCode.apply(null, out.subarray(i, i + chunk));
-    }
-    return 'data:image/png;base64,' + btoa(bin);
-  }
-  
-  const crcTable = (() => {
-    const t = new Uint32Array(256);
-    for (let n = 0; n < 256; n++) {
-      let c = n;
-      for (let k = 0; k < 8; k++) {
-        c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-      }
-      t[n] = c >>> 0;
-    }
-    return t;
-  })();
-  
-  function crc32(buf) {
-    let c = 0xFFFFFFFF;
-    for (let i = 0; i < buf.length; i++) {
-      c = crcTable[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
-    }
-    return (c ^ 0xFFFFFFFF) >>> 0;
-  }
-  
-  // ============ Инициализация ============
-  function init() {
-    addCategory('Тело');
-    addCategory('Глаза');
-    addCategory('Рот');
-    addCategory('Одежда');
-    
-    renderCategories();
-    renderCanvas();
-    
-    if (state.categories.length > 0) {
-      state.activeCategoryId = state.categories[0].id;
-      renderCategories();
-    }
-    
-    requestAnimationFrame(() => fitToScreen());
-    
-    window.addEventListener('resize', () => applyTransform());
-    window.addEventListener('orientationchange', () => {
-      setTimeout(() => applyTransform(), 300);
-    });
-  }
-  
-  init();
-})();
-</script>
-
-<!-- ============================================================
-     PWA: Регистрация Service Worker + обработка обновлений
-     ============================================================ -->
-<script>
-(function() {
-  'use strict';
-
-  // ---------- Регистрация Service Worker ----------
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js', { scope: './' })
-        .then((reg) => {
-          console.log('[PWA] Service Worker зарегистрирован:', reg.scope);
-
-          // Проверка обновлений при каждой загрузке
-          reg.update().catch(() => {});
-
-          // Отслеживаем установку нового SW
-          reg.addEventListener('updatefound', () => {
-            const newWorker = reg.installing;
-            if (!newWorker) return;
-
-            newWorker.addEventListener('statechange', () => {
-              // Новый SW установлен и есть активный старый → показываем баннер
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                showUpdateBanner(newWorker);
-              }
-            });
-          });
-        })
-        .catch((err) => console.warn('[PWA] Ошибка регистрации SW:', err));
-
-      // Периодическая проверка обновлений (каждый час)
-      setInterval(() => {
-        navigator.serviceWorker.getRegistration().then((reg) => {
-          if (reg) reg.update().catch(() => {});
-        });
-      }, 60 * 60 * 1000);
-    });
-
-    // Перезагрузка при смене контроллера (после активации нового SW)
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (refreshing) return;
-      refreshing = true;
-      window.location.reload();
-    });
-  } else {
-    console.log('[PWA] Service Worker не поддерживается');
-  }
-
-  // ---------- Баннер обновления ----------
-  const updateBanner = document.getElementById('update-banner');
-  const btnUpdate = document.getElementById('btn-update');
-  let waitingWorker = null;
-
-  function showUpdateBanner(worker) {
-    waitingWorker = worker;
-    updateBanner.classList.add('show');
-  }
-
-  btnUpdate.addEventListener('click', () => {
-    if (waitingWorker) {
-      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
-    }
-    updateBanner.classList.remove('show');
-  });
-
-  // ---------- Индикатор офлайн ----------
-  const offlineBadge = document.getElementById('offline-badge');
-
-  function updateOnlineStatus() {
-    if (navigator.onLine) {
-      offlineBadge.classList.remove('show');
-    } else {
-      offlineBadge.classList.add('show');
-    }
-  }
-
-  window.addEventListener('online', updateOnlineStatus);
-  window.addEventListener('offline', updateOnlineStatus);
-  updateOnlineStatus();
-
-  // ---------- Баннер установки PWA ----------
-  const installPrompt = document.getElementById('install-prompt');
-  const btnInstall = document.getElementById('install-accept');
-  const btnDismiss = document.getElementById('install-dismiss');
-  let deferredPrompt = null;
-
-  const DISMISS_KEY = 'pwa_install_dismissed_at';
-  const DISMISS_TTL = 7 * 24 * 60 * 60 * 1000; // 7 дней
-
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-
-    // Не показываем, если пользователь недавно закрыл
-    const dismissedAt = parseInt(localStorage.getItem(DISMISS_KEY) || '0', 10);
-    if (Date.now() - dismissedAt < DISMISS_TTL) return;
-
-    // Не показываем, если уже установлено
-    if (window.matchMedia('(display-mode: standalone)').matches) return;
-
-    installPrompt.classList.add('show');
-  });
-
-  btnInstall.addEventListener('click', async () => {
-    installPrompt.classList.remove('show');
-    if (!deferredPrompt) return;
-
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    console.log('[PWA] Результат установки:', outcome);
-    deferredPrompt = null;
-  });
-
-  btnDismiss.addEventListener('click', () => {
-    installPrompt.classList.remove('show');
-    localStorage.setItem(DISMISS_KEY, String(Date.now()));
-  });
-
-  // Скрываем баннер, если приложение уже установлено
-  window.addEventListener('appinstalled', () => {
-    installPrompt.classList.remove('show');
-    deferredPrompt = null;
-    console.log('[PWA] Приложение установлено');
-  });
-
-  // ---------- Обработка параметра ?new=1 (shortcut) ----------
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('new') === '1') {
-    // Можно добавить логику сброса, если нужно
-    console.log('[PWA] Запуск через ярлык "Новый персонаж"');
-  }
-})();
-</script>
+<!-- Модули -->
+<script src="./storage.js"></script>
+<script src="./history.js"></script>
+<script src="./renderer.js"></script>
+<script src="./exporter.js"></script>
+<script src="./gallery.js"></script>
+<script src="./app.js"></script>
 </body>
 </html>
