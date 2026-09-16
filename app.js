@@ -267,6 +267,7 @@
       isPanning = false;
       lastDist = 0;
 
+      // Double-tap → быстрый зум
       const now = Date.now();
       const t = e.changedTouches[0];
       if (now - lastTapTime < 300) {
@@ -366,13 +367,13 @@
       badge.textContent = '✎';
       tab.appendChild(badge);
 
-      // === Обработчики: тап / долгое нажатие / двойной тап ===
+      // === Обработчики ===
       let tapTimer = null;
       let longPressTimer = null;
       let longPressFired = false;
       let lastTapTime = 0;
 
-      const onPointerStart = () => {
+      const onPointerStart = (e) => {
         longPressFired = false;
         longPressTimer = setTimeout(() => {
           longPressFired = true;
@@ -381,7 +382,7 @@
         }, 500);
       };
 
-      const onPointerEnd = () => {
+      const onPointerEnd = (e) => {
         clearTimeout(longPressTimer);
         if (longPressFired) return;
 
@@ -409,7 +410,7 @@
       tab.addEventListener('mousedown', onPointerStart);
       tab.addEventListener('mouseup', onPointerEnd);
 
-      // Drag-and-drop для перестановки
+      // Drag-and-drop
       attachCategoryDrag(tab, cat.id);
 
       categoriesEl.appendChild(tab);
@@ -452,7 +453,7 @@
         return;
       }
 
-      if (e.cancelable) e.preventDefault();
+      e.preventDefault();
 
       const target = getTabUnder(touch.clientX);
       if (currentTarget && currentTarget !== target) {
@@ -555,8 +556,10 @@
     const el = document.getElementById('cat-edit-position');
     if (!el) return;
     el.textContent = `${idx + 1} из ${total}`;
-    document.getElementById('cat-edit-left').disabled = idx <= 0;
-    document.getElementById('cat-edit-right').disabled = idx >= total - 1;
+    const leftBtn = document.getElementById('cat-edit-left');
+    const rightBtn = document.getElementById('cat-edit-right');
+    if (leftBtn) leftBtn.disabled = idx <= 0;
+    if (rightBtn) rightBtn.disabled = idx >= total - 1;
   }
 
   function moveCategoryBy(direction) {
@@ -608,7 +611,6 @@
     renderCategories();
   }
 
-  // ============ Открытие категории ============
   function openCategory(catId) {
     state.activeCategoryId = catId;
     renderCategories();
@@ -625,7 +627,6 @@
     });
   }
 
-  // ============ Добавление / удаление категории ============
   function addCategory(name, icon) {
     const cat = {
       id: nextId(),
@@ -633,7 +634,7 @@
       icon: icon || undefined,
       visible: true,
       opacity: 1,
-      items: [],
+      items: []
     };
     state.categories.push(cat);
     state.activeCategoryId = cat.id;
@@ -801,6 +802,15 @@
       });
       actions.appendChild(visBtn);
 
+      const editBtn = document.createElement('button');
+      editBtn.className = 'btn';
+      editBtn.textContent = '✎';
+      editBtn.addEventListener('click', () => {
+        layersModal.classList.remove('open');
+        openCategoryEdit(cat.id);
+      });
+      actions.appendChild(editBtn);
+
       const upBtn = document.createElement('button');
       upBtn.className = 'btn';
       upBtn.textContent = '↑';
@@ -815,18 +825,9 @@
       downBtn.addEventListener('click', () => moveLayer(cat.id, -1));
       actions.appendChild(downBtn);
 
-      const editBtn = document.createElement('button');
-      editBtn.className = 'btn';
-      editBtn.textContent = '✎';
-      editBtn.addEventListener('click', () => {
-        layersModal.classList.remove('open');
-        openCategoryEdit(cat.id);
-      });
-      actions.appendChild(editBtn);
-
       row.appendChild(actions);
 
-      attachDragHandlers(row, cat.id);
+      attachLayerDragHandlers(row, cat.id);
 
       layersList.appendChild(row);
     }
@@ -844,7 +845,7 @@
     renderCategories();
   }
 
-  function attachDragHandlers(row, catId) {
+  function attachLayerDragHandlers(row, catId) {
     let startY = 0;
     let dragging = false;
 
@@ -857,7 +858,7 @@
 
     const onMove = (e) => {
       if (!dragging) return;
-      if (e.cancelable) e.preventDefault();
+      e.preventDefault();
       const touch = e.touches ? e.touches[0] : e;
       const y = touch.clientY;
       const rows = [...layersList.querySelectorAll('.layer-row')];
@@ -870,7 +871,7 @@
       if (target) target.classList.add('drag-over');
     };
 
-    const onEnd = () => {
+    const onEnd = (e) => {
       if (!dragging) return;
       dragging = false;
       row.classList.remove('dragging');
@@ -897,18 +898,7 @@
     row.addEventListener('touchmove', onMove, { passive: false });
     row.addEventListener('touchend', onEnd);
     row.addEventListener('mousedown', onStart);
-    // Делегированные листенеры — добавляем один раз
-    if (!attachDragHandlers._bound) {
-      attachDragHandlers._bound = true;
-      window.addEventListener('mousemove', (e) => {
-        const dragging = document.querySelector('.layer-row.dragging');
-        if (dragging) {
-          const evt = new MouseEvent('mousemove', { clientY: e.clientY, bubbles: true });
-          // Простейший путь — вызываем onMove через замыкание не получится,
-          // поэтому используем глобальный таргет:
-        }
-      });
-    }
+    window.addEventListener('mousemove', (e) => { if (dragging) onMove(e); });
     window.addEventListener('mouseup', onEnd);
   }
 
@@ -968,3 +958,324 @@
           const lx = lc.getContext('2d');
           drawItemWithTransform(lx, item);
           layers.push({ name: cat.name, canvas: lc });
+        }
+
+        updateProgress(60, 'Кодирование PSD…');
+        await nextFrame();
+
+        const blob = await Exporter.buildPSD(layers, CANVAS_SIZE, CANVAS_SIZE);
+        updateProgress(95);
+        Exporter.download(blob, 'character.psd');
+        toast('PSD экспортирован', 'success');
+      } else if (format === 'json') {
+        const json = Exporter.serializeProject({
+          ...state,
+          categories: state.categories,
+        });
+        const blob = new Blob([json], { type: 'application/json' });
+        Exporter.download(blob, `character_${Date.now()}.json`);
+        toast('JSON экспортирован', 'success');
+      }
+    } catch (e) {
+      console.error(e);
+      toast('Ошибка экспорта: ' + e.message, 'error');
+    } finally {
+      hideProgress();
+    }
+  }
+
+  function drawItemWithTransform(context, item) {
+    const img = item.img;
+    if (!img) return;
+    const t = item.transform;
+    if (!t) {
+      context.drawImage(img, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+      return;
+    }
+    const { x = 0, y = 0, scale = 1, rotation = 0, flipX = false, flipY = false } = t;
+    context.save();
+    context.translate(CANVAS_SIZE / 2 + x, CANVAS_SIZE / 2 + y);
+    context.rotate(rotation);
+    context.scale(flipX ? -scale : scale, flipY ? -scale : scale);
+    context.drawImage(img, -CANVAS_SIZE / 2, -CANVAS_SIZE / 2, CANVAS_SIZE, CANVAS_SIZE);
+    context.restore();
+  }
+
+  // ============ Галерея ============
+  const gallery = createGallery({
+    getCurrentState: () => state,
+    loadState: (newState) => {
+      state = { ...newState };
+      renderer.invalidateAll();
+      renderCategories();
+      if (state.activeCategoryId) openCategory(state.activeCategoryId);
+      else itemsPanel.classList.remove('open');
+      history.reset(snapshot());
+      renderAll();
+      autoSaver.schedule();
+    },
+    toast,
+    confirm: confirmDialog,
+  });
+
+  // ============ Модальные окна ============
+  function setupModals() {
+    document.querySelectorAll('.modal-bg').forEach(bg => {
+      bg.addEventListener('click', (e) => {
+        if (e.target === bg) bg.classList.remove('open');
+      });
+    });
+    document.querySelectorAll('[data-close]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        btn.closest('.modal-bg').classList.remove('open');
+      });
+    });
+  }
+
+  // ============ Инициализация UI ============
+  function bindUI() {
+    // Undo/Redo
+    document.getElementById('btn-undo').addEventListener('click', () => {
+      const s = history.undo();
+      if (s) restoreFromSnapshot(s);
+    });
+    document.getElementById('btn-redo').addEventListener('click', () => {
+      const s = history.redo();
+      if (s) restoreFromSnapshot(s);
+    });
+
+    // Ctrl+Z / Ctrl+Y
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        document.getElementById('btn-undo').click();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        document.getElementById('btn-redo').click();
+      }
+    });
+
+    // Галерея
+    document.getElementById('btn-gallery').addEventListener('click', () => gallery.open());
+    document.getElementById('gallery-new').addEventListener('click', async () => {
+      const name = prompt('Название персонажа:', 'Персонаж');
+      if (name === null) return;
+      const proj = await gallery.createNew(name);
+      state.id = proj.id;
+      state.name = proj.name;
+      autoSaver.schedule();
+      toast('Новый персонаж создан');
+      gallery.close();
+    });
+    document.getElementById('gallery-import').addEventListener('click', () => {
+      document.getElementById('modal-import').classList.add('open');
+    });
+
+    // Слои
+    document.getElementById('btn-layers').addEventListener('click', openLayers);
+
+    // Новая категория
+    document.getElementById('btn-add-cat').addEventListener('click', () => {
+      document.getElementById('cat-name').value = '';
+      document.getElementById('modal-cat').classList.add('open');
+      setTimeout(() => document.getElementById('cat-name').focus(), 50);
+    });
+    document.getElementById('cat-save').addEventListener('click', () => {
+      const name = document.getElementById('cat-name').value.trim();
+      if (!name) { toast('Введите название', 'error'); return; }
+      addCategory(name);
+      document.getElementById('modal-cat').classList.remove('open');
+    });
+
+    // Добавить элемент
+    document.getElementById('item-save').addEventListener('click', async () => {
+      const catId = state.activeCategoryId;
+      const files = document.getElementById('item-file').files;
+      if (!catId || !files || files.length === 0) {
+        toast('Выберите изображения', 'error');
+        return;
+      }
+      const name = document.getElementById('item-name').value;
+      document.getElementById('modal-item').classList.remove('open');
+      await addItemsFromFiles(catId, files, name);
+    });
+
+    // Экспорт
+    document.getElementById('btn-export').addEventListener('click', openExportModal);
+    setupExportModal();
+
+    // Импорт
+    document.getElementById('btn-import').addEventListener('click', () => {
+      document.getElementById('import-file').value = '';
+      document.getElementById('modal-import').classList.add('open');
+    });
+    document.getElementById('import-confirm').addEventListener('click', async () => {
+      const file = document.getElementById('import-file').files[0];
+      if (!file) { toast('Выберите файл', 'error'); return; }
+      const text = await file.text();
+      const proj = await gallery.importFromJSON(text);
+      if (proj) {
+        document.getElementById('modal-import').classList.remove('open');
+        await gallery.loadProject(proj.id);
+      }
+    });
+
+    // Новый проект
+    document.getElementById('btn-new').addEventListener('click', async () => {
+      if (!await confirmDialog('Создать нового персонажа? Текущий сохранится в галерее.')) return;
+      const name = prompt('Название персонажа:', 'Персонаж');
+      if (name === null) return;
+      const proj = await gallery.createNew(name);
+      state.categories = [];
+      state.activeItems = {};
+      state.activeCategoryId = null;
+      state.id = proj.id;
+      state.name = proj.name;
+      state.canvasBg = '#ffffff';
+      renderer.invalidateAll();
+      renderCategories();
+      itemsPanel.classList.remove('open');
+      history.reset(snapshot());
+      renderAll();
+      toast('Новый персонаж создан');
+    });
+
+    // Закрыть панель элементов
+    document.getElementById('btn-close-items').addEventListener('click', () => {
+      itemsPanel.classList.remove('open');
+    });
+
+    // Зум
+    document.getElementById('zoom-in').addEventListener('click', () => setScale(view.scale * 1.25));
+    document.getElementById('zoom-out').addEventListener('click', () => setScale(view.scale * 0.8));
+    document.getElementById('zoom-100').addEventListener('click', () => {
+      view.offsetX = 0;
+      view.offsetY = 0;
+      setScale(1);
+    });
+    document.getElementById('zoom-fit').addEventListener('click', fitToScreen);
+
+    // Инструменты холста
+    document.getElementById('tool-grid').addEventListener('click', (e) => {
+      view.gridOn = !view.gridOn;
+      e.currentTarget.classList.toggle('active', view.gridOn);
+      applyTransform();
+    });
+    document.getElementById('tool-checker').addEventListener('click', (e) => {
+      view.checkerOn = !view.checkerOn;
+      e.currentTarget.classList.toggle('active', view.checkerOn);
+      canvasWrap.classList.toggle('checker', view.checkerOn);
+    });
+    document.getElementById('tool-center').addEventListener('click', (e) => {
+      view.centerOn = !view.centerOn;
+      e.currentTarget.classList.toggle('active', view.centerOn);
+      applyTransform();
+    });
+
+    // === Редактирование категории ===
+    const saveBtn = document.getElementById('cat-edit-save');
+    if (saveBtn) saveBtn.addEventListener('click', saveCategoryEdit);
+
+    const leftBtn = document.getElementById('cat-edit-left');
+    if (leftBtn) leftBtn.addEventListener('click', () => moveCategoryBy(-1));
+
+    const rightBtn = document.getElementById('cat-edit-right');
+    if (rightBtn) rightBtn.addEventListener('click', () => moveCategoryBy(+1));
+
+    const nameInput = document.getElementById('cat-edit-name');
+    if (nameInput) {
+      nameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          saveCategoryEdit();
+        }
+      });
+    }
+
+    const closeBtn = document.querySelector('#modal-cat-edit [data-close]');
+    if (closeBtn) closeBtn.addEventListener('click', closeCategoryEdit);
+
+    const editModal = document.getElementById('modal-cat-edit');
+    if (editModal) {
+      editModal.addEventListener('click', (e) => {
+        if (e.target.id === 'modal-cat-edit') closeCategoryEdit();
+      });
+    }
+  }
+
+  // ============ Модалка экспорта ============
+  let exportFormat = 'png';
+  let exportSize = 4096;
+
+  function setupExportModal() {
+    const formatPresets = document.querySelectorAll('#export-format-presets .export-preset');
+    formatPresets.forEach(p => {
+      p.addEventListener('click', () => {
+        formatPresets.forEach(x => x.classList.remove('active'));
+        p.classList.add('active');
+        exportFormat = p.dataset.format;
+        document.getElementById('export-png-opts').style.display = exportFormat === 'png' ? '' : 'none';
+        document.getElementById('export-psd-opts').style.display = exportFormat === 'psd' ? '' : 'none';
+        document.getElementById('export-json-opts').style.display = exportFormat === 'json' ? '' : 'none';
+      });
+    });
+
+    const sizePresets = document.querySelectorAll('#export-size-presets .export-preset');
+    sizePresets.forEach(p => {
+      p.addEventListener('click', () => {
+        sizePresets.forEach(x => x.classList.remove('active'));
+        p.classList.add('active');
+        exportSize = parseInt(p.dataset.size, 10);
+      });
+    });
+
+    document.getElementById('export-confirm').addEventListener('click', async () => {
+      const transparent = document.getElementById('export-transparent').checked;
+      document.getElementById('modal-export').classList.remove('open');
+      await doExport(exportFormat, exportSize, transparent);
+    });
+  }
+
+  // ============ Открытие модалки элемента ============
+  function openModalItem(catId) {
+    document.getElementById('item-name').value = '';
+    document.getElementById('item-file').value = '';
+    document.getElementById('modal-item').classList.add('open');
+  }
+
+  // ============ Инициализация ============
+  async function init() {
+    setupModals();
+    bindUI();
+
+    try {
+      const projects = await Storage.getAllProjects();
+      if (projects.length > 0) {
+        await gallery.loadProject(projects[0].id);
+      } else {
+        addCategory('Тело');
+        addCategory('Глаза');
+        addCategory('Рот');
+        addCategory('Одежда');
+        state.activeCategoryId = state.categories[0].id;
+        renderCategories();
+        history.reset(snapshot());
+        const proj = await gallery.createNew(state.name);
+        state.id = proj.id;
+        autoSaver.schedule();
+      }
+    } catch (e) {
+      console.error('Ошибка инициализации:', e);
+      renderCategories();
+    }
+
+    requestAnimationFrame(fitToScreen);
+
+    window.addEventListener('resize', () => applyTransform());
+    window.addEventListener('orientationchange', () => setTimeout(applyTransform, 300));
+
+    setInterval(() => autoSaver.schedule(), 30000);
+  }
+
+  init();
+})();
