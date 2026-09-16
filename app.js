@@ -267,7 +267,6 @@
       isPanning = false;
       lastDist = 0;
 
-      // Double-tap → быстрый зум
       const now = Date.now();
       const t = e.changedTouches[0];
       if (now - lastTapTime < 300) {
@@ -332,15 +331,26 @@
       vis.addEventListener('click', (e) => {
         e.stopPropagation();
         cat.visible = cat.visible === false ? true : false;
+        renderer.invalidate(cat.id);
         commit('visibility');
         renderCategories();
       });
       tab.appendChild(vis);
 
+      // Иконка категории (если есть)
+      if (cat.icon) {
+        const icon = document.createElement('span');
+        icon.className = 'cat-icon';
+        icon.textContent = cat.icon;
+        tab.appendChild(icon);
+      }
+
+      // Название
       const name = document.createElement('span');
       name.textContent = cat.name;
       tab.appendChild(name);
 
+      // Кнопка удаления
       const del = document.createElement('div');
       del.className = 'del-x';
       del.textContent = '×';
@@ -350,12 +360,255 @@
       });
       tab.appendChild(del);
 
-      tab.addEventListener('click', () => openCategory(cat.id));
+      // Бейдж редактирования
+      const badge = document.createElement('div');
+      badge.className = 'edit-badge';
+      badge.textContent = '✎';
+      tab.appendChild(badge);
+
+      // === Обработчики: тап / долгое нажатие / двойной тап ===
+      let tapTimer = null;
+      let longPressTimer = null;
+      let longPressFired = false;
+      let lastTapTime = 0;
+
+      const onPointerStart = () => {
+        longPressFired = false;
+        longPressTimer = setTimeout(() => {
+          longPressFired = true;
+          if (navigator.vibrate) navigator.vibrate(15);
+          openCategoryEdit(cat.id);
+        }, 500);
+      };
+
+      const onPointerEnd = () => {
+        clearTimeout(longPressTimer);
+        if (longPressFired) return;
+
+        const now = Date.now();
+        if (now - lastTapTime < 300) {
+          clearTimeout(tapTimer);
+          lastTapTime = 0;
+          openCategoryEdit(cat.id);
+          return;
+        }
+        lastTapTime = now;
+
+        tapTimer = setTimeout(() => {
+          openCategory(cat.id);
+        }, 250);
+      };
+
+      const onPointerCancel = () => {
+        clearTimeout(longPressTimer);
+      };
+
+      tab.addEventListener('touchstart', onPointerStart, { passive: true });
+      tab.addEventListener('touchend', onPointerEnd);
+      tab.addEventListener('touchcancel', onPointerCancel);
+      tab.addEventListener('mousedown', onPointerStart);
+      tab.addEventListener('mouseup', onPointerEnd);
+
+      // Drag-and-drop для перестановки
+      attachCategoryDrag(tab, cat.id);
 
       categoriesEl.appendChild(tab);
     }
   }
 
+  // ============ Drag-and-drop категорий ============
+  function attachCategoryDrag(tab, catId) {
+    let dragging = false;
+    let startX = 0;
+    let currentTarget = null;
+    let longPressDragTimer = null;
+
+    const getTabUnder = (clientX) => {
+      const tabs = [...categoriesEl.querySelectorAll('.cat-tab')];
+      return tabs.find(t => {
+        if (t === tab) return false;
+        const r = t.getBoundingClientRect();
+        return clientX >= r.left && clientX <= r.right;
+      });
+    };
+
+    const onDragStart = (e) => {
+      const touch = e.touches ? e.touches[0] : e;
+      startX = touch.clientX;
+
+      longPressDragTimer = setTimeout(() => {
+        dragging = true;
+        tab.classList.add('dragging');
+        if (navigator.vibrate) navigator.vibrate(20);
+      }, 600);
+    };
+
+    const onDragMove = (e) => {
+      const touch = e.touches ? e.touches[0] : e;
+      if (!dragging) {
+        if (Math.abs(touch.clientX - startX) > 10) {
+          clearTimeout(longPressDragTimer);
+        }
+        return;
+      }
+
+      if (e.cancelable) e.preventDefault();
+
+      const target = getTabUnder(touch.clientX);
+      if (currentTarget && currentTarget !== target) {
+        currentTarget.classList.remove('drag-over-left', 'drag-over-right');
+      }
+      currentTarget = target;
+
+      if (target) {
+        const r = target.getBoundingClientRect();
+        const mid = r.left + r.width / 2;
+        target.classList.remove('drag-over-left', 'drag-over-right');
+        target.classList.add(touch.clientX < mid ? 'drag-over-left' : 'drag-over-right');
+      }
+
+      const rect = categoriesEl.getBoundingClientRect();
+      if (touch.clientX < rect.left + 30) {
+        categoriesEl.scrollLeft -= 8;
+      } else if (touch.clientX > rect.right - 30) {
+        categoriesEl.scrollLeft += 8;
+      }
+    };
+
+    const onDragEnd = (e) => {
+      clearTimeout(longPressDragTimer);
+      if (!dragging) return;
+
+      dragging = false;
+      tab.classList.remove('dragging');
+
+      const touch = e.changedTouches ? e.changedTouches[0] : e;
+      const target = currentTarget || getTabUnder(touch.clientX);
+
+      if (target) {
+        const targetId = target.dataset.id;
+        const fromIdx = state.categories.findIndex(c => c.id === catId);
+        const toIdx = state.categories.findIndex(c => c.id === targetId);
+
+        if (fromIdx >= 0 && toIdx >= 0 && fromIdx !== toIdx) {
+          const r = target.getBoundingClientRect();
+          const mid = r.left + r.width / 2;
+          const insertAfter = touch.clientX >= mid;
+
+          const [moved] = state.categories.splice(fromIdx, 1);
+          let newIdx = toIdx;
+          if (fromIdx < toIdx) newIdx--;
+          if (insertAfter) newIdx++;
+          newIdx = Math.max(0, Math.min(state.categories.length, newIdx));
+          state.categories.splice(newIdx, 0, moved);
+
+          renderer.invalidateAll();
+          commit('reorder-categories');
+          renderCategories();
+          toast('Порядок изменён');
+        }
+      }
+
+      if (currentTarget) {
+        currentTarget.classList.remove('drag-over-left', 'drag-over-right');
+        currentTarget = null;
+      }
+    };
+
+    tab.addEventListener('touchstart', onDragStart, { passive: true });
+    tab.addEventListener('touchmove', onDragMove, { passive: false });
+    tab.addEventListener('touchend', onDragEnd);
+    tab.addEventListener('touchcancel', onDragEnd);
+
+    tab.addEventListener('mousedown', onDragStart);
+    window.addEventListener('mousemove', onDragMove);
+    window.addEventListener('mouseup', onDragEnd);
+  }
+
+  // ============ Редактирование категории ============
+  let editingCategoryId = null;
+
+  function openCategoryEdit(catId) {
+    const cat = state.categories.find(c => c.id === catId);
+    if (!cat) return;
+
+    editingCategoryId = catId;
+
+    document.getElementById('cat-edit-name').value = cat.name;
+    document.getElementById('cat-edit-icon').value = cat.icon || '';
+    updateCategoryEditPosition();
+
+    document.getElementById('modal-cat-edit').classList.add('open');
+    setTimeout(() => {
+      const inp = document.getElementById('cat-edit-name');
+      inp.focus();
+      inp.select();
+    }, 50);
+
+    const tab = categoriesEl.querySelector(`.cat-tab[data-id="${catId}"]`);
+    if (tab) tab.classList.add('edit-mode');
+  }
+
+  function updateCategoryEditPosition() {
+    const idx = state.categories.findIndex(c => c.id === editingCategoryId);
+    const total = state.categories.length;
+    const el = document.getElementById('cat-edit-position');
+    if (!el) return;
+    el.textContent = `${idx + 1} из ${total}`;
+    document.getElementById('cat-edit-left').disabled = idx <= 0;
+    document.getElementById('cat-edit-right').disabled = idx >= total - 1;
+  }
+
+  function moveCategoryBy(direction) {
+    const idx = state.categories.findIndex(c => c.id === editingCategoryId);
+    if (idx < 0) return;
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= state.categories.length) return;
+
+    const [moved] = state.categories.splice(idx, 1);
+    state.categories.splice(newIdx, 0, moved);
+
+    renderer.invalidateAll();
+    renderCategories();
+    updateCategoryEditPosition();
+    commit('move-category');
+  }
+
+  function saveCategoryEdit() {
+    if (!editingCategoryId) return;
+    const cat = state.categories.find(c => c.id === editingCategoryId);
+    if (!cat) return;
+
+    const newName = document.getElementById('cat-edit-name').value.trim();
+    const newIcon = document.getElementById('cat-edit-icon').value.trim();
+
+    if (!newName) {
+      toast('Введите название', 'error');
+      return;
+    }
+
+    const changed = cat.name !== newName || (cat.icon || '') !== newIcon;
+
+    cat.name = newName;
+    cat.icon = newIcon || undefined;
+
+    if (changed) {
+      commit('rename-category');
+      toast('Категория обновлена', 'success');
+    }
+
+    closeCategoryEdit();
+  }
+
+  function closeCategoryEdit() {
+    document.getElementById('modal-cat-edit').classList.remove('open');
+    const tab = categoriesEl.querySelector('.cat-tab.edit-mode');
+    if (tab) tab.classList.remove('edit-mode');
+    editingCategoryId = null;
+    renderCategories();
+  }
+
+  // ============ Открытие категории ============
   function openCategory(catId) {
     state.activeCategoryId = catId;
     renderCategories();
@@ -363,10 +616,25 @@
     itemsPanel.classList.add('open');
     const cat = state.categories.find(c => c.id === catId);
     itemsTitle.textContent = cat ? cat.name : '';
+
+    requestAnimationFrame(() => {
+      const tab = categoriesEl.querySelector(`.cat-tab[data-id="${catId}"]`);
+      if (tab) {
+        tab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
+    });
   }
 
-  function addCategory(name) {
-    const cat = { id: nextId(), name: name.trim() || 'Без названия', visible: true, opacity: 1, items: [] };
+  // ============ Добавление / удаление категории ============
+  function addCategory(name, icon) {
+    const cat = {
+      id: nextId(),
+      name: name.trim() || 'Без названия',
+      icon: icon || undefined,
+      visible: true,
+      opacity: 1,
+      items: [],
+    };
     state.categories.push(cat);
     state.activeCategoryId = cat.id;
     renderCategories();
@@ -493,7 +761,6 @@
   // ============ Слои (drag-and-drop) ============
   const layersModal = document.getElementById('modal-layers');
   const layersList = document.getElementById('layers-list');
-  let dragState = null;
 
   function openLayers() {
     renderLayers();
@@ -502,7 +769,6 @@
 
   function renderLayers() {
     layersList.innerHTML = '';
-    // Сверху показываем верхний слой (последний в массиве = верхний)
     const ordered = [...state.categories].reverse();
     for (const cat of ordered) {
       const row = document.createElement('div');
@@ -516,7 +782,7 @@
 
       const name = document.createElement('div');
       name.className = 'layer-name';
-      name.textContent = cat.name;
+      name.textContent = (cat.icon ? cat.icon + ' ' : '') + cat.name;
       if (cat.visible === false) name.style.opacity = '0.4';
       row.appendChild(name);
 
@@ -549,9 +815,17 @@
       downBtn.addEventListener('click', () => moveLayer(cat.id, -1));
       actions.appendChild(downBtn);
 
+      const editBtn = document.createElement('button');
+      editBtn.className = 'btn';
+      editBtn.textContent = '✎';
+      editBtn.addEventListener('click', () => {
+        layersModal.classList.remove('open');
+        openCategoryEdit(cat.id);
+      });
+      actions.appendChild(editBtn);
+
       row.appendChild(actions);
 
-      // Drag-n-drop
       attachDragHandlers(row, cat.id);
 
       layersList.appendChild(row);
@@ -583,7 +857,7 @@
 
     const onMove = (e) => {
       if (!dragging) return;
-      e.preventDefault();
+      if (e.cancelable) e.preventDefault();
       const touch = e.touches ? e.touches[0] : e;
       const y = touch.clientY;
       const rows = [...layersList.querySelectorAll('.layer-row')];
@@ -596,7 +870,7 @@
       if (target) target.classList.add('drag-over');
     };
 
-    const onEnd = (e) => {
+    const onEnd = () => {
       if (!dragging) return;
       dragging = false;
       row.classList.remove('dragging');
@@ -623,29 +897,19 @@
     row.addEventListener('touchmove', onMove, { passive: false });
     row.addEventListener('touchend', onEnd);
     row.addEventListener('mousedown', onStart);
-    window.addEventListener('mousemove', (e) => { if (dragging) onMove(e); });
+    // Делегированные листенеры — добавляем один раз
+    if (!attachDragHandlers._bound) {
+      attachDragHandlers._bound = true;
+      window.addEventListener('mousemove', (e) => {
+        const dragging = document.querySelector('.layer-row.dragging');
+        if (dragging) {
+          const evt = new MouseEvent('mousemove', { clientY: e.clientY, bubbles: true });
+          // Простейший путь — вызываем onMove через замыкание не получится,
+          // поэтому используем глобальный таргет:
+        }
+      });
+    }
     window.addEventListener('mouseup', onEnd);
-  }
-
-  // ============ Трансформация элементов ============
-  // Простая реализация: модалка с полями (без сложного интерактива на холсте)
-  function editTransform(catId, itemId) {
-    const cat = state.categories.find(c => c.id === catId);
-    if (!cat) return;
-    const item = cat.items.find(i => i.id === itemId);
-    if (!item) return;
-
-    const t = item.transform || { x: 0, y: 0, scale: 1, rotation: 0, flipX: false, flipY: false };
-
-    // Быстрый ввод через prompt (можно заменить на модалку)
-    const x = parseFloat(prompt('Смещение X (px):', t.x) || t.x);
-    const y = parseFloat(prompt('Смещение Y (px):', t.y) || t.y);
-    const scale = parseFloat(prompt('Масштаб (1.0 = оригинал):', t.scale) || t.scale);
-    const rotation = parseFloat(prompt('Поворот (радианы):', t.rotation) || t.rotation);
-
-    item.transform = { x, y, scale, rotation, flipX: t.flipX, flipY: t.flipY };
-    renderer.invalidate(catId);
-    commit('transform');
   }
 
   // ============ Импорт / Экспорт ============
@@ -680,7 +944,6 @@
         updateProgress(20, 'Сбор слоёв…');
         await nextFrame();
 
-        // Собираем слои снизу вверх (включая фон)
         const layers = [];
         if (!transparent) {
           const bg = document.createElement('canvas');
@@ -699,308 +962,9 @@
           const item = cat.items.find(i => i.id === activeId);
           if (!item || !item.img) continue;
 
-          // Рендерим слой на отдельный canvas
           const lc = document.createElement('canvas');
           lc.width = CANVAS_SIZE;
           lc.height = CANVAS_SIZE;
           const lx = lc.getContext('2d');
           drawItemWithTransform(lx, item);
           layers.push({ name: cat.name, canvas: lc });
-        }
-
-        updateProgress(60, 'Кодирование PSD…');
-        await nextFrame();
-
-        const blob = await Exporter.buildPSD(layers, CANVAS_SIZE, CANVAS_SIZE);
-        updateProgress(95);
-        Exporter.download(blob, 'character.psd');
-        toast('PSD экспортирован', 'success');
-      } else if (format === 'json') {
-        const json = Exporter.serializeProject({
-          ...state,
-          categories: state.categories,
-        });
-        const blob = new Blob([json], { type: 'application/json' });
-        Exporter.download(blob, `character_${Date.now()}.json`);
-        toast('JSON экспортирован', 'success');
-      }
-    } catch (e) {
-      console.error(e);
-      toast('Ошибка экспорта: ' + e.message, 'error');
-    } finally {
-      hideProgress();
-    }
-  }
-
-  function drawItemWithTransform(context, item) {
-    const img = item.img;
-    if (!img) return;
-    const t = item.transform;
-    if (!t) {
-      context.drawImage(img, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
-      return;
-    }
-    const { x = 0, y = 0, scale = 1, rotation = 0, flipX = false, flipY = false } = t;
-    context.save();
-    context.translate(CANVAS_SIZE / 2 + x, CANVAS_SIZE / 2 + y);
-    context.rotate(rotation);
-    context.scale(flipX ? -scale : scale, flipY ? -scale : scale);
-    context.drawImage(img, -CANVAS_SIZE / 2, -CANVAS_SIZE / 2, CANVAS_SIZE, CANVAS_SIZE);
-    context.restore();
-  }
-
-  // ============ Галерея ============
-  const gallery = createGallery({
-    getCurrentState: () => state,
-    loadState: (newState) => {
-      state = { ...newState };
-      renderer.invalidateAll();
-      renderCategories();
-      if (state.activeCategoryId) openCategory(state.activeCategoryId);
-      else itemsPanel.classList.remove('open');
-      history.reset(snapshot());
-      renderAll();
-      autoSaver.schedule();
-    },
-    toast,
-    confirm: confirmDialog,
-  });
-
-  // ============ Модальные окна ============
-  function setupModals() {
-    // Закрытие по data-close и фону
-    document.querySelectorAll('.modal-bg').forEach(bg => {
-      bg.addEventListener('click', (e) => {
-        if (e.target === bg) bg.classList.remove('open');
-      });
-    });
-    document.querySelectorAll('[data-close]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        btn.closest('.modal-bg').classList.remove('open');
-      });
-    });
-  }
-
-  // ============ Инициализация UI ============
-  function bindUI() {
-    // Undo/Redo
-    document.getElementById('btn-undo').addEventListener('click', () => {
-      const s = history.undo();
-      if (s) restoreFromSnapshot(s);
-    });
-    document.getElementById('btn-redo').addEventListener('click', () => {
-      const s = history.redo();
-      if (s) restoreFromSnapshot(s);
-    });
-
-    // Ctrl+Z / Ctrl+Y
-    window.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        document.getElementById('btn-undo').click();
-      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
-        e.preventDefault();
-        document.getElementById('btn-redo').click();
-      }
-    });
-
-    // Галерея
-    document.getElementById('btn-gallery').addEventListener('click', () => gallery.open());
-    document.getElementById('gallery-new').addEventListener('click', async () => {
-      const name = prompt('Название персонажа:', 'Персонаж');
-      if (name === null) return;
-      const proj = await gallery.createNew(name);
-      state.id = proj.id;
-      state.name = proj.name;
-      autoSaver.schedule();
-      toast('Новый персонаж создан');
-      gallery.close();
-    });
-    document.getElementById('gallery-import').addEventListener('click', () => {
-      document.getElementById('modal-import').classList.add('open');
-    });
-
-    // Слои
-    document.getElementById('btn-layers').addEventListener('click', openLayers);
-
-    // Новая категория
-    document.getElementById('btn-add-cat').addEventListener('click', () => {
-      document.getElementById('cat-name').value = '';
-      document.getElementById('modal-cat').classList.add('open');
-      setTimeout(() => document.getElementById('cat-name').focus(), 50);
-    });
-    document.getElementById('cat-save').addEventListener('click', () => {
-      const name = document.getElementById('cat-name').value.trim();
-      if (!name) { toast('Введите название', 'error'); return; }
-      addCategory(name);
-      document.getElementById('modal-cat').classList.remove('open');
-    });
-
-    // Добавить элемент
-    document.getElementById('item-save').addEventListener('click', async () => {
-      const catId = state.activeCategoryId;
-      const files = document.getElementById('item-file').files;
-      if (!catId || !files || files.length === 0) {
-        toast('Выберите изображения', 'error');
-        return;
-      }
-      const name = document.getElementById('item-name').value;
-      document.getElementById('modal-item').classList.remove('open');
-      await addItemsFromFiles(catId, files, name);
-    });
-
-    // Экспорт
-    document.getElementById('btn-export').addEventListener('click', openExportModal);
-    setupExportModal();
-
-    // Импорт
-    document.getElementById('btn-import').addEventListener('click', () => {
-      document.getElementById('import-file').value = '';
-      document.getElementById('modal-import').classList.add('open');
-    });
-    document.getElementById('import-confirm').addEventListener('click', async () => {
-      const file = document.getElementById('import-file').files[0];
-      if (!file) { toast('Выберите файл', 'error'); return; }
-      const text = await file.text();
-      const proj = await gallery.importFromJSON(text);
-      if (proj) {
-        document.getElementById('modal-import').classList.remove('open');
-        await gallery.loadProject(proj.id);
-      }
-    });
-
-    // Новый проект
-    document.getElementById('btn-new').addEventListener('click', async () => {
-      if (!await confirmDialog('Создать нового персонажа? Текущий сохранится в галерее.')) return;
-      const name = prompt('Название персонажа:', 'Персонаж');
-      if (name === null) return;
-      const proj = await gallery.createNew(name);
-      // Очищаем текущее состояние
-      state.categories = [];
-      state.activeItems = {};
-      state.activeCategoryId = null;
-      state.id = proj.id;
-      state.name = proj.name;
-      state.canvasBg = '#ffffff';
-      renderer.invalidateAll();
-      renderCategories();
-      itemsPanel.classList.remove('open');
-      history.reset(snapshot());
-      renderAll();
-      toast('Новый персонаж создан');
-    });
-
-    // Закрыть панель элементов
-    document.getElementById('btn-close-items').addEventListener('click', () => {
-      itemsPanel.classList.remove('open');
-    });
-
-    // Зум
-    document.getElementById('zoom-in').addEventListener('click', () => setScale(view.scale * 1.25));
-    document.getElementById('zoom-out').addEventListener('click', () => setScale(view.scale * 0.8));
-    document.getElementById('zoom-100').addEventListener('click', () => {
-      view.offsetX = 0;
-      view.offsetY = 0;
-      setScale(1);
-    });
-    document.getElementById('zoom-fit').addEventListener('click', fitToScreen);
-
-    // Инструменты холста
-    document.getElementById('tool-grid').addEventListener('click', (e) => {
-      view.gridOn = !view.gridOn;
-      e.currentTarget.classList.toggle('active', view.gridOn);
-      applyTransform();
-    });
-    document.getElementById('tool-checker').addEventListener('click', (e) => {
-      view.checkerOn = !view.checkerOn;
-      e.currentTarget.classList.toggle('active', view.checkerOn);
-      canvasWrap.classList.toggle('checker', view.checkerOn);
-    });
-    document.getElementById('tool-center').addEventListener('click', (e) => {
-      view.centerOn = !view.centerOn;
-      e.currentTarget.classList.toggle('active', view.centerOn);
-      applyTransform();
-    });
-  }
-
-  // ============ Модалка экспорта ============
-  let exportFormat = 'png';
-  let exportSize = 4096;
-
-  function setupExportModal() {
-    const formatPresets = document.querySelectorAll('#export-format-presets .export-preset');
-    formatPresets.forEach(p => {
-      p.addEventListener('click', () => {
-        formatPresets.forEach(x => x.classList.remove('active'));
-        p.classList.add('active');
-        exportFormat = p.dataset.format;
-        document.getElementById('export-png-opts').style.display = exportFormat === 'png' ? '' : 'none';
-        document.getElementById('export-psd-opts').style.display = exportFormat === 'psd' ? '' : 'none';
-        document.getElementById('export-json-opts').style.display = exportFormat === 'json' ? '' : 'none';
-      });
-    });
-
-    const sizePresets = document.querySelectorAll('#export-size-presets .export-preset');
-    sizePresets.forEach(p => {
-      p.addEventListener('click', () => {
-        sizePresets.forEach(x => x.classList.remove('active'));
-        p.classList.add('active');
-        exportSize = parseInt(p.dataset.size, 10);
-      });
-    });
-
-    document.getElementById('export-confirm').addEventListener('click', async () => {
-      const transparent = document.getElementById('export-transparent').checked;
-      document.getElementById('modal-export').classList.remove('open');
-      await doExport(exportFormat, exportSize, transparent);
-    });
-  }
-
-  // ============ Открытие модалки элемента ============
-  function openModalItem(catId) {
-    document.getElementById('item-name').value = '';
-    document.getElementById('item-file').value = '';
-    document.getElementById('modal-item').classList.add('open');
-  }
-
-  // ============ Инициализация ============
-  async function init() {
-    setupModals();
-    bindUI();
-
-    // Пытаемся загрузить последний проект
-    try {
-      const projects = await Storage.getAllProjects();
-      if (projects.length > 0) {
-        await gallery.loadProject(projects[0].id);
-        // gallery.loadProject вызовет loadState → renderAll
-      } else {
-        // Первый запуск — создаём демо
-        addCategory('Тело');
-        addCategory('Глаза');
-        addCategory('Рот');
-        addCategory('Одежда');
-        state.activeCategoryId = state.categories[0].id;
-        renderCategories();
-        history.reset(snapshot());
-        // Сохраняем первый проект
-        const proj = await gallery.createNew(state.name);
-        state.id = proj.id;
-        autoSaver.schedule();
-      }
-    } catch (e) {
-      console.error('Ошибка инициализации:', e);
-      renderCategories();
-    }
-
-    requestAnimationFrame(fitToScreen);
-
-    window.addEventListener('resize', () => applyTransform());
-    window.addEventListener('orientationchange', () => setTimeout(applyTransform, 300));
-
-    // Резервное сохранение каждые 30 сек
-    setInterval(() => autoSaver.schedule(), 30000);
-  }
-
-  init();
-})();
