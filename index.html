@@ -5,13 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Редактор персонажа</title>
 
+<!-- PWA -->
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#2a2a2a">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Редактор">
-<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
 
 <style>
   * {
@@ -101,7 +103,6 @@
     touch-action: none;
   }
 
-  /* Шахматный фон для прозрачности */
   #canvas-wrap.checker::before {
     content: '';
     position: absolute;
@@ -127,7 +128,6 @@
     transform-origin: 0 0;
   }
 
-  /* Сетка */
   #grid-overlay {
     position: absolute;
     pointer-events: none;
@@ -140,7 +140,6 @@
   }
   #grid-overlay.show { display: block; }
 
-  /* Центр-маркер */
   #center-marker {
     position: absolute;
     width: 20px;
@@ -166,7 +165,6 @@
     transform: translateY(-0.5px);
   }
 
-  /* Кнопки зума */
   #zoom-controls {
     position: absolute;
     top: 10px;
@@ -187,7 +185,6 @@
     border-radius: 22px;
   }
 
-  /* Инфо-панель холста */
   #zoom-info {
     position: absolute;
     top: 10px;
@@ -202,7 +199,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Быстрые инструменты холста */
   #canvas-tools {
     position: absolute;
     top: 10px;
@@ -244,6 +240,7 @@
     scrollbar-width: none;
     flex-shrink: 0;
     min-height: 60px;
+    -webkit-overflow-scrolling: touch;
   }
   #categories::-webkit-scrollbar { display: none; }
 
@@ -262,6 +259,7 @@
     align-items: center;
     position: relative;
     gap: 6px;
+    transition: transform 0.15s ease, opacity 0.15s ease;
   }
   .cat-tab.active {
     background: #4a7cff;
@@ -282,6 +280,59 @@
   .cat-tab .visibility-btn.off {
     background: rgba(255,255,255,0.15);
     color: #888;
+  }
+
+  /* Индикатор drag-and-drop для табов */
+  .cat-tab.dragging {
+    opacity: 0.5;
+    transform: scale(1.05);
+    z-index: 10;
+  }
+
+  .cat-tab.drag-over-left::before,
+  .cat-tab.drag-over-right::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    width: 3px;
+    background: #4a7cff;
+    border-radius: 2px;
+  }
+  .cat-tab.drag-over-left::before { left: -5px; }
+  .cat-tab.drag-over-right::after { right: -5px; }
+
+  @keyframes tab-wiggle {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-1deg); }
+    75% { transform: rotate(1deg); }
+  }
+
+  .cat-tab.edit-mode {
+    animation: tab-wiggle 0.3s ease-in-out 3;
+  }
+
+  .cat-tab .cat-icon {
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .cat-tab .edit-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 20px;
+    height: 20px;
+    background: #4a7cff;
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    border: 2px solid #2a2a2a;
+  }
+  .cat-tab.edit-mode .edit-badge {
+    display: flex;
   }
 
   /* ===== Панель элементов ===== */
@@ -491,7 +542,7 @@
     font-size: 12px;
   }
 
-  /* ===== Слои (drag-and-drop) ===== */
+  /* ===== Слои ===== */
   .layer-row {
     display: flex;
     align-items: center;
@@ -764,6 +815,33 @@
   </div>
 </div>
 
+<!-- ===== Модалка: редактирование категории ===== -->
+<div class="modal-bg" id="modal-cat-edit">
+  <div class="modal">
+    <h3>Категория</h3>
+
+    <label>Название</label>
+    <input type="text" id="cat-edit-name" placeholder="Название категории">
+
+    <label>Позиция</label>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button class="btn" id="cat-edit-left" style="flex:0 0 auto;">←</button>
+      <div id="cat-edit-position" style="flex:1;text-align:center;color:#aaa;font-size:13px;">
+        1 из 1
+      </div>
+      <button class="btn" id="cat-edit-right" style="flex:0 0 auto;">→</button>
+    </div>
+
+    <label>Иконка (эмодзи, необязательно)</label>
+    <input type="text" id="cat-edit-icon" placeholder="👁️" maxlength="4" style="width:80px;">
+
+    <div class="modal-actions">
+      <button class="btn" data-close>Отмена</button>
+      <button class="btn primary" id="cat-edit-save">Сохранить</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== Модалка: новый элемент ===== -->
 <div class="modal-bg" id="modal-item">
   <div class="modal">
@@ -898,5 +976,129 @@
 <script src="./exporter.js"></script>
 <script src="./gallery.js"></script>
 <script src="./app.js"></script>
+
+<!-- ============================================================
+     PWA: Регистрация Service Worker + обработка обновлений
+     ============================================================ -->
+<script>
+(function() {
+  'use strict';
+
+  // ---------- Регистрация Service Worker ----------
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js', { scope: './' })
+        .then((reg) => {
+          console.log('[PWA] Service Worker зарегистрирован:', reg.scope);
+          reg.update().catch(() => {});
+
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            if (!newWorker) return;
+
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                showUpdateBanner(newWorker);
+              }
+            });
+          });
+        })
+        .catch((err) => console.warn('[PWA] Ошибка регистрации SW:', err));
+
+      setInterval(() => {
+        navigator.serviceWorker.getRegistration().then((reg) => {
+          if (reg) reg.update().catch(() => {});
+        });
+      }, 60 * 60 * 1000);
+    });
+
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+  }
+
+  // ---------- Баннер обновления ----------
+  const updateBanner = document.getElementById('update-banner');
+  const btnUpdate = document.getElementById('btn-update');
+  let waitingWorker = null;
+
+  function showUpdateBanner(worker) {
+    waitingWorker = worker;
+    updateBanner.classList.add('show');
+  }
+
+  btnUpdate.addEventListener('click', () => {
+    if (waitingWorker) {
+      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+    }
+    updateBanner.classList.remove('show');
+  });
+
+  // ---------- Индикатор офлайн ----------
+  const offlineBadge = document.getElementById('offline-badge');
+
+  function updateOnlineStatus() {
+    if (navigator.onLine) {
+      offlineBadge.classList.remove('show');
+    } else {
+      offlineBadge.classList.add('show');
+    }
+  }
+
+  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('offline', updateOnlineStatus);
+  updateOnlineStatus();
+
+  // ---------- Баннер установки PWA ----------
+  const installPrompt = document.getElementById('install-prompt');
+  const btnInstall = document.getElementById('install-accept');
+  const btnDismiss = document.getElementById('install-dismiss');
+  let deferredPrompt = null;
+
+  const DISMISS_KEY = 'pwa_install_dismissed_at';
+  const DISMISS_TTL = 7 * 24 * 60 * 60 * 1000;
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+
+    const dismissedAt = parseInt(localStorage.getItem(DISMISS_KEY) || '0', 10);
+    if (Date.now() - dismissedAt < DISMISS_TTL) return;
+    if (window.matchMedia('(display-mode: standalone)').matches) return;
+
+    installPrompt.classList.add('show');
+  });
+
+  btnInstall.addEventListener('click', async () => {
+    installPrompt.classList.remove('show');
+    if (!deferredPrompt) return;
+
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log('[PWA] Результат установки:', outcome);
+    deferredPrompt = null;
+  });
+
+  btnDismiss.addEventListener('click', () => {
+    installPrompt.classList.remove('show');
+    localStorage.setItem(DISMISS_KEY, String(Date.now()));
+  });
+
+  window.addEventListener('appinstalled', () => {
+    installPrompt.classList.remove('show');
+    deferredPrompt = null;
+    console.log('[PWA] Приложение установлено');
+  });
+
+  // ---------- Обработка параметра ?new=1 ----------
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('new') === '1') {
+    console.log('[PWA] Запуск через ярлык "Новый персонаж"');
+  }
+})();
+</script>
 </body>
 </html>
