@@ -249,7 +249,7 @@
     color: #fff;
     border: 1px solid #555;
     border-radius: 20px;
-    padding: 8px 16px;
+    padding: 8px 14px;
     font-size: 13px;
     white-space: nowrap;
     cursor: pointer;
@@ -258,7 +258,7 @@
     display: flex;
     align-items: center;
     position: relative;
-    gap: 6px;
+    gap: 4px;
     transition: transform 0.15s ease, opacity 0.15s ease;
   }
   .cat-tab.active {
@@ -317,6 +317,28 @@
     margin-right: 2px;
   }
 
+  /* Кнопка редактирования категории ✎ */
+  .cat-tab .edit-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    line-height: 1;
+    margin-left: 2px;
+    transition: background 0.15s;
+  }
+  .cat-tab .edit-btn:active {
+    background: rgba(74,124,255,0.6);
+  }
+  .cat-tab.active .edit-btn {
+    background: rgba(255,255,255,0.25);
+  }
+
+  /* Бейдж в режиме редактирования */
   .cat-tab .edit-badge {
     position: absolute;
     top: -6px;
