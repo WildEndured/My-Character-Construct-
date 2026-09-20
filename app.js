@@ -1,10 +1,9 @@
-/* app.js — сборка редактора */
+/* app.js — сборка редактора (с фиксами производительности) */
 (function() {
   'use strict';
 
   const CANVAS_SIZE = 4096;
 
-  // ============ Состояние ============
   let state = {
     id: 'proj_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
     name: 'Новый персонаж',
@@ -24,7 +23,6 @@
   let uid = 1;
   const nextId = () => 'id_' + (uid++);
 
-  // ============ DOM ============
   const canvas = document.getElementById('canvas');
   const canvasWrap = document.getElementById('canvas-wrap');
   const categoriesEl = document.getElementById('categories');
@@ -35,7 +33,6 @@
   const gridOverlay = document.getElementById('grid-overlay');
   const centerMarker = document.getElementById('center-marker');
 
-  // ============ Рендерер ============
   const renderer = createRenderer(canvas);
 
   // ============ Тост ============
@@ -95,10 +92,21 @@
     };
   }
 
+  // Debounce рендера — единый кадр
+  let renderScheduled = false;
+  function scheduleRender() {
+    if (renderScheduled) return;
+    renderScheduled = true;
+    requestAnimationFrame(() => {
+      renderScheduled = false;
+      renderAll();
+    });
+  }
+
   function commit(label) {
     history.push(snapshot(), label);
     autoSaver.schedule();
-    requestAnimationFrame(() => renderAll());
+    scheduleRender();
   }
 
   function restoreFromSnapshot(snap) {
@@ -111,20 +119,31 @@
       state.attributes = snap.attributes;
       attributes.deserialize(snap.attributes);
     }
+    renderer.invalidateAll();
     renderCategories();
     if (state.activeCategoryId) renderItems();
-    renderer.invalidateAll();
-    renderAll();
+    scheduleRender();
   }
 
   // ============ Атрибуты ============
+  let attributesReady = false;
+
   const attributes = createAttributes({
     getState: () => state,
-    setState: (s) => { state = s; },
-    toast,
-    commit,
     invalidate: (catId) => renderer.invalidate(catId),
+    // Лёгкий колбэк — только рендер без истории
+    onBindingsChanged: (changedCats) => {
+      scheduleRender();
+      autoSaver.schedule();
+    },
+    // Тяжёлый — с историей (для явных действий пользователя)
+    onDataChanged: (label) => {
+      history.push(snapshot(), label);
+      autoSaver.schedule();
+      scheduleRender();
+    },
   });
+  attributesReady = true;
 
   // ============ Автосохранение ============
   const autoSaver = Storage.createAutoSaver(() => {
@@ -356,7 +375,6 @@
       const editBtn = document.createElement('div');
       editBtn.className = 'edit-btn';
       editBtn.textContent = '✎';
-      editBtn.title = 'Редактировать';
       editBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         if (navigator.vibrate) navigator.vibrate(10);
@@ -658,6 +676,7 @@
         const img = document.createElement('img');
         img.src = item.src;
         img.alt = item.name;
+        img.loading = 'lazy';
         card.appendChild(img);
       } else {
         card.textContent = item.name;
@@ -978,18 +997,28 @@
   const gallery = createGallery({
     getCurrentState: () => state,
     loadState: (newState) => {
-      state = { ...newState };
+      // Выгружаем старые canvas ПЕРЕД загрузкой
       renderer.invalidateAll();
+      state = { ...newState };
       if (state.attributes) {
         attributes.deserialize(state.attributes);
+      } else {
+        attributes.reset();
       }
       renderCategories();
       if (state.activeCategoryId) openCategory(state.activeCategoryId);
       else itemsPanel.classList.remove('open');
       history.reset(snapshot());
-      renderAll();
-      // Применяем привязки
-      setTimeout(() => attributes.applyAllBindings(), 300);
+      // Один рендер
+      scheduleRender();
+      // Применяем привязки с задержкой, чтобы не тормозить
+      setTimeout(() => {
+        try {
+          attributes.applyAllBindings();
+        } catch (e) {
+          console.warn('applyAllBindings error:', e);
+        }
+      }, 500);
       autoSaver.schedule();
     },
     toast,
@@ -1052,7 +1081,7 @@
       const name = prompt('Название модуля:', 'Новый модуль');
       if (name === null) return;
       attributes.addModule(name);
-      getBindingsUI().render();
+      getBindingsUI().scheduleRender();
     });
     document.getElementById('binding-cancel').addEventListener('click', () => {
       document.getElementById('modal-binding').classList.remove('open');
@@ -1123,6 +1152,7 @@
       const name = prompt('Название персонажа:', 'Персонаж');
       if (name === null) return;
       const proj = await gallery.createNew(name);
+      renderer.invalidateAll();
       state.categories = [];
       state.activeItems = {};
       state.activeCategoryId = null;
@@ -1130,12 +1160,11 @@
       state.name = proj.name;
       state.canvasBg = '#ffffff';
       state.attributes = null;
-      attributes.deserialize(null);
-      renderer.invalidateAll();
+      attributes.reset();
       renderCategories();
       itemsPanel.classList.remove('open');
       history.reset(snapshot());
-      renderAll();
+      scheduleRender();
       toast('Новый персонаж создан');
     });
 
