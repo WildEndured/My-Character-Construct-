@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Редактор персонажа</title>
 
-<!-- PWA -->
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#2a2a2a">
 <meta name="mobile-web-app-capable" content="yes">
@@ -47,7 +46,6 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 
-  /* ===== Верхняя панель ===== */
   #toolbar {
     display: flex;
     align-items: center;
@@ -86,7 +84,6 @@
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn.icon-only { padding: 10px; font-size: 18px; }
 
-  /* ===== Основная область ===== */
   #main {
     flex: 1;
     display: flex;
@@ -94,7 +91,6 @@
     overflow: hidden;
   }
 
-  /* ===== Холст ===== */
   #canvas-wrap {
     flex: 1;
     position: relative;
@@ -224,11 +220,8 @@
     min-height: 36px;
     min-width: 36px;
   }
-  #canvas-tools .btn.active {
-    background: #4a7cff;
-  }
+  #canvas-tools .btn.active { background: #4a7cff; }
 
-  /* ===== Нижняя панель категорий ===== */
   #categories {
     display: flex;
     align-items: center;
@@ -261,10 +254,7 @@
     gap: 4px;
     transition: transform 0.15s ease, opacity 0.15s ease;
   }
-  .cat-tab.active {
-    background: #4a7cff;
-    border-color: #4a7cff;
-  }
+  .cat-tab.active { background: #4a7cff; border-color: #4a7cff; }
   .cat-tab .del-x,
   .cat-tab .visibility-btn {
     width: 22px;
@@ -277,24 +267,14 @@
     font-size: 13px;
     line-height: 1;
   }
-  .cat-tab .visibility-btn.off {
-    background: rgba(255,255,255,0.15);
-    color: #888;
-  }
+  .cat-tab .visibility-btn.off { background: rgba(255,255,255,0.15); color: #888; }
 
-  /* Индикатор drag-and-drop для табов */
-  .cat-tab.dragging {
-    opacity: 0.5;
-    transform: scale(1.05);
-    z-index: 10;
-  }
-
+  .cat-tab.dragging { opacity: 0.5; transform: scale(1.05); z-index: 10; }
   .cat-tab.drag-over-left::before,
   .cat-tab.drag-over-right::after {
     content: '';
     position: absolute;
-    top: 4px;
-    bottom: 4px;
+    top: 4px; bottom: 4px;
     width: 3px;
     background: #4a7cff;
     border-radius: 2px;
@@ -307,17 +287,10 @@
     25% { transform: rotate(-1deg); }
     75% { transform: rotate(1deg); }
   }
+  .cat-tab.edit-mode { animation: tab-wiggle 0.3s ease-in-out 3; }
 
-  .cat-tab.edit-mode {
-    animation: tab-wiggle 0.3s ease-in-out 3;
-  }
+  .cat-tab .cat-icon { font-size: 15px; margin-right: 2px; }
 
-  .cat-tab .cat-icon {
-    font-size: 15px;
-    margin-right: 2px;
-  }
-
-  /* Кнопка редактирования категории ✎ */
   .cat-tab .edit-btn {
     width: 22px;
     height: 22px;
@@ -331,14 +304,9 @@
     margin-left: 2px;
     transition: background 0.15s;
   }
-  .cat-tab .edit-btn:active {
-    background: rgba(74,124,255,0.6);
-  }
-  .cat-tab.active .edit-btn {
-    background: rgba(255,255,255,0.25);
-  }
+  .cat-tab .edit-btn:active { background: rgba(74,124,255,0.6); }
+  .cat-tab.active .edit-btn { background: rgba(255,255,255,0.25); }
 
-  /* Бейдж в режиме редактирования */
   .cat-tab .edit-badge {
     position: absolute;
     top: -6px;
@@ -353,16 +321,12 @@
     font-size: 11px;
     border: 2px solid #2a2a2a;
   }
-  .cat-tab.edit-mode .edit-badge {
-    display: flex;
-  }
+  .cat-tab.edit-mode .edit-badge { display: flex; }
 
-  /* ===== Панель элементов ===== */
   #items-panel {
     position: absolute;
     bottom: 70px;
-    left: 0;
-    right: 0;
+    left: 0; right: 0;
     background: #242424;
     border-top: 1px solid #444;
     max-height: 45vh;
@@ -387,740 +351,4 @@
 
   #items-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-    gap: 8px;
-    padding: 10px;
-    overflow-y: auto;
-    max-height: 38vh;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .item-card {
-    background: #333;
-    border: 2px solid #444;
-    border-radius: 8px;
-    aspect-ratio: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    overflow: hidden;
-    position: relative;
-    font-size: 11px;
-    padding: 4px;
-    text-align: center;
-    color: #ccc;
-  }
-  .item-card.active {
-    border-color: #4a7cff;
-    box-shadow: 0 0 8px rgba(74,124,255,0.5);
-  }
-  .item-card img {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-    pointer-events: none;
-  }
-  .item-card .del-x {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: rgba(192,57,43,0.9);
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    z-index: 2;
-  }
-  .add-item-btn {
-    background: #2a2a2a;
-    border: 2px dashed #555;
-    color: #888;
-    font-size: 28px;
-  }
-
-  /* ===== Модалки ===== */
-  .modal-bg {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.75);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    padding: 20px;
-    padding-top: calc(20px + env(safe-area-inset-top));
-    padding-bottom: calc(20px + env(safe-area-inset-bottom));
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-  }
-  .modal-bg.open { display: flex; }
-
-  .modal {
-    background: #2a2a2a;
-    border-radius: 12px;
-    padding: 20px;
-    width: 100%;
-    max-width: 440px;
-    max-height: 85vh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .modal h3 { margin: 0 0 15px; font-size: 16px; }
-  .modal label {
-    display: block;
-    font-size: 13px;
-    color: #aaa;
-    margin-bottom: 6px;
-    margin-top: 12px;
-  }
-  .modal input[type="text"],
-  .modal input[type="number"],
-  .modal select,
-  .modal textarea {
-    width: 100%;
-    background: #1a1a1a;
-    border: 1px solid #444;
-    color: #fff;
-    padding: 10px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-family: inherit;
-  }
-  .modal input[type="file"] {
-    width: 100%;
-    color: #ccc;
-    font-size: 13px;
-    padding: 8px 0;
-  }
-  .modal-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 20px;
-  }
-  .modal-actions .btn { flex: 1; }
-  .hint { font-size: 11px; color: #888; margin-top: 6px; }
-
-  /* ===== Галерея ===== */
-  #gallery-modal .modal { max-width: 700px; }
-  .gallery-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 10px;
-    margin-top: 12px;
-  }
-  .gallery-card {
-    background: #333;
-    border: 2px solid #444;
-    border-radius: 10px;
-    padding: 8px;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-  .gallery-card.active {
-    border-color: #4a7cff;
-  }
-  .gallery-card .thumb {
-    aspect-ratio: 1;
-    background: #fff;
-    border-radius: 6px;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .gallery-card .thumb img {
-    width: 100%; height: 100%; object-fit: contain;
-  }
-  .gallery-card .title {
-    font-size: 12px;
-    color: #ddd;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .gallery-card .meta {
-    font-size: 10px;
-    color: #888;
-    text-align: center;
-  }
-  .gallery-card .actions {
-    display: flex;
-    gap: 4px;
-  }
-  .gallery-card .actions .btn {
-    flex: 1;
-    padding: 6px;
-    min-height: 32px;
-    min-width: 0;
-    font-size: 12px;
-  }
-
-  /* ===== Слои ===== */
-  .layer-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: #333;
-    border-radius: 8px;
-    padding: 8px 10px;
-    margin-bottom: 6px;
-    touch-action: none;
-  }
-  .layer-row.dragging { opacity: 0.5; }
-  .layer-row.drag-over { border-top: 2px solid #4a7cff; }
-  .layer-row .handle {
-    cursor: grab;
-    color: #888;
-    font-size: 18px;
-    padding: 4px;
-  }
-  .layer-row .layer-name { flex: 1; font-size: 14px; }
-  .layer-row .layer-actions { display: flex; gap: 4px; }
-  .layer-row .btn {
-    padding: 6px;
-    min-height: 32px;
-    min-width: 32px;
-    font-size: 14px;
-  }
-
-  /* ===== Пресеты экспорта ===== */
-  .export-presets {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin-top: 8px;
-  }
-  .export-preset {
-    background: #333;
-    border: 2px solid #444;
-    border-radius: 8px;
-    padding: 12px;
-    text-align: center;
-    font-size: 12px;
-    cursor: pointer;
-  }
-  .export-preset.active {
-    border-color: #4a7cff;
-    background: #2a3a5a;
-  }
-
-  /* ===== Тосты ===== */
-  #toasts {
-    position: fixed;
-    bottom: calc(80px + env(safe-area-inset-bottom));
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    z-index: 300;
-    pointer-events: none;
-    max-width: 90vw;
-  }
-  .toast {
-    background: rgba(50,50,50,0.95);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    color: #fff;
-    padding: 10px 16px;
-    border-radius: 10px;
-    font-size: 13px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-    animation: toast-in 0.25s ease;
-    white-space: nowrap;
-  }
-  .toast.success { background: rgba(46,160,67,0.95); }
-  .toast.error { background: rgba(192,57,43,0.95); }
-  @keyframes toast-in {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  /* ===== Прогресс-бар ===== */
-  #progress-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 400;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-  }
-  #progress-overlay.show { display: flex; }
-  #progress-box {
-    background: #2a2a2a;
-    padding: 24px 32px;
-    border-radius: 12px;
-    text-align: center;
-    min-width: 240px;
-  }
-  #progress-box .label { font-size: 14px; margin-bottom: 12px; }
-  #progress-box .bar {
-    height: 6px;
-    background: #1a1a1a;
-    border-radius: 3px;
-    overflow: hidden;
-  }
-  #progress-box .fill {
-    height: 100%;
-    background: #4a7cff;
-    width: 0%;
-    transition: width 0.2s;
-  }
-
-  /* ===== Индикатор сохранения ===== */
-  #save-indicator {
-    position: fixed;
-    top: calc(8px + env(safe-area-inset-top));
-    right: 8px;
-    background: rgba(46,160,67,0.9);
-    color: #fff;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 11px;
-    z-index: 250;
-    opacity: 0;
-    transition: opacity 0.3s;
-    pointer-events: none;
-  }
-  #save-indicator.show { opacity: 1; }
-
-  /* ===== Офлайн / обновление ===== */
-  #update-banner {
-    position: fixed;
-    bottom: calc(80px + env(safe-area-inset-bottom));
-    left: 10px;
-    right: 10px;
-    background: #4a7cff;
-    color: #fff;
-    padding: 12px 16px;
-    border-radius: 10px;
-    display: none;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    font-size: 13px;
-    z-index: 200;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-  }
-  #update-banner.show { display: flex; }
-  #update-banner .btn {
-    background: rgba(255,255,255,0.2);
-    border: none;
-    padding: 8px 14px;
-    font-size: 13px;
-    min-height: 36px;
-    min-width: auto;
-  }
-
-  #offline-badge {
-    position: fixed;
-    top: calc(10px + env(safe-area-inset-top));
-    left: 50%;
-    transform: translateX(-50%);
-    background: #c0392b;
-    color: #fff;
-    padding: 4px 12px;
-    border-radius: 12px;
-    font-size: 11px;
-    z-index: 200;
-    display: none;
-  }
-  #offline-badge.show { display: block; }
-
-  #install-prompt {
-    position: fixed;
-    bottom: calc(20px + env(safe-area-inset-bottom));
-    left: 10px;
-    right: 10px;
-    background: #333;
-    border: 1px solid #555;
-    border-radius: 12px;
-    padding: 12px 16px;
-    display: none;
-    align-items: center;
-    gap: 12px;
-    z-index: 200;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-  }
-  #install-prompt.show { display: flex; }
-  #install-prompt .icon { font-size: 28px; flex-shrink: 0; }
-  #install-prompt .text { flex: 1; font-size: 12px; line-height: 1.4; }
-  #install-prompt .text strong { display: block; font-size: 13px; margin-bottom: 2px; }
-  #install-prompt .actions { display: flex; gap: 6px; flex-shrink: 0; }
-  #install-prompt .btn {
-    padding: 8px 12px;
-    min-height: 36px;
-    min-width: auto;
-    font-size: 12px;
-  }
-
-  /* ===== Undo/Redo flash ===== */
-  @keyframes flash {
-    0%, 100% { background: #3a3a3a; }
-    50% { background: #4a7cff; }
-  }
-  .btn.flash { animation: flash 0.3s ease; }
-</style>
-</head>
-<body>
-<div id="app">
-  <!-- Верхняя панель -->
-  <div id="toolbar">
-    <button class="btn icon-only" id="btn-undo" title="Отменить">↶</button>
-    <button class="btn icon-only" id="btn-redo" title="Повторить">↷</button>
-    <button class="btn" id="btn-gallery">🖼️ Галерея</button>
-    <button class="btn" id="btn-layers">📚 Слои</button>
-    <button class="btn" id="btn-add-cat">➕</button>
-    <button class="btn primary" id="btn-export">💾</button>
-    <button class="btn" id="btn-import">📥</button>
-    <button class="btn" id="btn-new">✨</button>
-  </div>
-
-  <!-- Основная область -->
-  <div id="main">
-    <div id="canvas-wrap">
-      <canvas id="canvas" width="4096" height="4096"></canvas>
-      <div id="grid-overlay"></div>
-      <div id="center-marker"></div>
-      <div id="zoom-info">4096×4096 · 300 DPI · 100%</div>
-      <div id="canvas-tools">
-        <button class="btn" id="tool-grid" title="Сетка">⊞</button>
-        <button class="btn" id="tool-checker" title="Прозрачность">▦</button>
-        <button class="btn" id="tool-center" title="Центр">⊕</button>
-      </div>
-      <div id="zoom-controls">
-        <button class="btn" id="zoom-in">＋</button>
-        <button class="btn" id="zoom-out">－</button>
-        <button class="btn" id="zoom-100" title="100%">1:1</button>
-        <button class="btn" id="zoom-fit">⤢</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Панель элементов -->
-  <div id="items-panel">
-    <div id="items-header">
-      <span id="items-title">Категория</span>
-      <div class="header-actions">
-        <button class="btn" id="btn-close-items" style="min-height:32px;padding:6px 12px;font-size:13px;">Закрыть</button>
-      </div>
-    </div>
-    <div id="items-list"></div>
-  </div>
-
-  <!-- Категории -->
-  <div id="categories"></div>
-</div>
-
-<!-- ===== Модалка: новая категория ===== -->
-<div class="modal-bg" id="modal-cat">
-  <div class="modal">
-    <h3>Новая категория</h3>
-    <label>Название</label>
-    <input type="text" id="cat-name" placeholder="Например: Глаза">
-    <div class="modal-actions">
-      <button class="btn" data-close>Отмена</button>
-      <button class="btn primary" id="cat-save">Добавить</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== Модалка: редактирование категории ===== -->
-<div class="modal-bg" id="modal-cat-edit">
-  <div class="modal">
-    <h3>Категория</h3>
-
-    <label>Название</label>
-    <input type="text" id="cat-edit-name" placeholder="Название категории">
-
-    <label>Позиция</label>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <button class="btn" id="cat-edit-left" style="flex:0 0 auto;">←</button>
-      <div id="cat-edit-position" style="flex:1;text-align:center;color:#aaa;font-size:13px;">
-        1 из 1
-      </div>
-      <button class="btn" id="cat-edit-right" style="flex:0 0 auto;">→</button>
-    </div>
-
-    <label>Иконка (эмодзи, необязательно)</label>
-    <input type="text" id="cat-edit-icon" placeholder="👁️" maxlength="4" style="width:80px;">
-
-    <div class="modal-actions">
-      <button class="btn" data-close>Отмена</button>
-      <button class="btn primary" id="cat-edit-save">Сохранить</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== Модалка: новый элемент ===== -->
-<div class="modal-bg" id="modal-item">
-  <div class="modal">
-    <h3>Добавить элемент</h3>
-    <label>Название</label>
-    <input type="text" id="item-name" placeholder="Например: Круглые глаза">
-    <label>Изображение (PNG с прозрачностью)</label>
-    <input type="file" id="item-file" accept="image/*" multiple>
-    <div class="hint">Можно выбрать несколько сразу. Рекомендуется PNG 4096×4096.</div>
-    <div class="modal-actions">
-      <button class="btn" data-close>Отмена</button>
-      <button class="btn primary" id="item-save">Добавить</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== Модалка: слои ===== -->
-<div class="modal-bg" id="modal-layers">
-  <div class="modal">
-    <h3>Слои (порядок отрисовки)</h3>
-    <div class="hint" style="margin-bottom:12px;">
-      Перетащите за ⠿ для изменения порядка. Верхний = рисуется последним.
-    </div>
-    <div id="layers-list"></div>
-    <div class="modal-actions">
-      <button class="btn primary" data-close>Готово</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== Модалка: галерея ===== -->
-<div class="modal-bg" id="gallery-modal">
-  <div class="modal">
-    <h3>Мои персонажи</h3>
-    <div style="display:flex;gap:8px;margin-bottom:8px;">
-      <button class="btn primary" id="gallery-new" style="flex:1;">＋ Новый</button>
-      <button class="btn" id="gallery-import" style="flex:1;">📥 Импорт</button>
-    </div>
-    <div class="gallery-grid" id="gallery-grid"></div>
-    <div class="modal-actions">
-      <button class="btn" data-close>Закрыть</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== Модалка: экспорт ===== -->
-<div class="modal-bg" id="modal-export">
-  <div class="modal">
-    <h3>Экспорт</h3>
-    <label>Формат</label>
-    <div class="export-presets" id="export-format-presets">
-      <div class="export-preset active" data-format="png">PNG</div>
-      <div class="export-preset" data-format="psd">PSD</div>
-      <div class="export-preset" data-format="json">JSON</div>
-    </div>
-    <div id="export-png-opts">
-      <label>Размер</label>
-      <div class="export-presets" id="export-size-presets">
-        <div class="export-preset" data-size="512">512</div>
-        <div class="export-preset" data-size="1024">1024</div>
-        <div class="export-preset" data-size="2048">2048</div>
-        <div class="export-preset active" data-size="4096">4096</div>
-      </div>
-      <label><input type="checkbox" id="export-transparent"> Прозрачный фон</label>
-    </div>
-    <div id="export-psd-opts" style="display:none;">
-      <div class="hint">
-        Каждая категория будет отдельным слоем в PSD.
-        Файл совместим с Photoshop, GIMP, Krita, Procreate.
-      </div>
-    </div>
-    <div id="export-json-opts" style="display:none;">
-      <div class="hint">
-        JSON содержит все категории, элементы и настройки.
-        Можно передать другому пользователю.
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn" data-close>Отмена</button>
-      <button class="btn primary" id="export-confirm">Экспортировать</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== Модалка: импорт ===== -->
-<div class="modal-bg" id="modal-import">
-  <div class="modal">
-    <h3>Импорт проекта</h3>
-    <label>Выберите .json файл</label>
-    <input type="file" id="import-file" accept="application/json,.json">
-    <div class="hint">Проект будет добавлен в галерею.</div>
-    <div class="modal-actions">
-      <button class="btn" data-close>Отмена</button>
-      <button class="btn primary" id="import-confirm">Импортировать</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== Индикаторы ===== -->
-<div id="toasts"></div>
-<div id="save-indicator">💾 Сохранено</div>
-
-<div id="progress-overlay">
-  <div id="progress-box">
-    <div class="label" id="progress-label">Обработка…</div>
-    <div class="bar"><div class="fill" id="progress-fill"></div></div>
-  </div>
-</div>
-
-<div id="update-banner">
-  <span>Доступна новая версия</span>
-  <button class="btn" id="btn-update">Обновить</button>
-</div>
-<div id="offline-badge">📴 Офлайн-режим</div>
-
-<div id="install-prompt">
-  <div class="icon">📱</div>
-  <div class="text">
-    <strong>Установить приложение</strong>
-    Работает офлайн, быстрый доступ
-  </div>
-  <div class="actions">
-    <button class="btn" id="install-dismiss">Позже</button>
-    <button class="btn primary" id="install-accept">Установить</button>
-  </div>
-</div>
-
-<!-- Модули -->
-<script src="./storage.js"></script>
-<script src="./history.js"></script>
-<script src="./renderer.js"></script>
-<script src="./exporter.js"></script>
-<script src="./gallery.js"></script>
-<script src="./app.js"></script>
-
-<!-- ============================================================
-     PWA: Регистрация Service Worker + обработка обновлений
-     ============================================================ -->
-<script>
-(function() {
-  'use strict';
-
-  // ---------- Регистрация Service Worker ----------
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js', { scope: './' })
-        .then((reg) => {
-          console.log('[PWA] Service Worker зарегистрирован:', reg.scope);
-          reg.update().catch(() => {});
-
-          reg.addEventListener('updatefound', () => {
-            const newWorker = reg.installing;
-            if (!newWorker) return;
-
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                showUpdateBanner(newWorker);
-              }
-            });
-          });
-        })
-        .catch((err) => console.warn('[PWA] Ошибка регистрации SW:', err));
-
-      setInterval(() => {
-        navigator.serviceWorker.getRegistration().then((reg) => {
-          if (reg) reg.update().catch(() => {});
-        });
-      }, 60 * 60 * 1000);
-    });
-
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (refreshing) return;
-      refreshing = true;
-      window.location.reload();
-    });
-  }
-
-  // ---------- Баннер обновления ----------
-  const updateBanner = document.getElementById('update-banner');
-  const btnUpdate = document.getElementById('btn-update');
-  let waitingWorker = null;
-
-  function showUpdateBanner(worker) {
-    waitingWorker = worker;
-    updateBanner.classList.add('show');
-  }
-
-  btnUpdate.addEventListener('click', () => {
-    if (waitingWorker) {
-      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
-    }
-    updateBanner.classList.remove('show');
-  });
-
-  // ---------- Индикатор офлайн ----------
-  const offlineBadge = document.getElementById('offline-badge');
-
-  function updateOnlineStatus() {
-    if (navigator.onLine) {
-      offlineBadge.classList.remove('show');
-    } else {
-      offlineBadge.classList.add('show');
-    }
-  }
-
-  window.addEventListener('online', updateOnlineStatus);
-  window.addEventListener('offline', updateOnlineStatus);
-  updateOnlineStatus();
-
-  // ---------- Баннер установки PWA ----------
-  const installPrompt = document.getElementById('install-prompt');
-  const btnInstall = document.getElementById('install-accept');
-  const btnDismiss = document.getElementById('install-dismiss');
-  let deferredPrompt = null;
-
-  const DISMISS_KEY = 'pwa_install_dismissed_at';
-  const DISMISS_TTL = 7 * 24 * 60 * 60 * 1000;
-
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-
-    const dismissedAt = parseInt(localStorage.getItem(DISMISS_KEY) || '0', 10);
-    if (Date.now() - dismissedAt < DISMISS_TTL) return;
-    if (window.matchMedia('(display-mode: standalone)').matches) return;
-
-    installPrompt.classList.add('show');
-  });
-
-  btnInstall.addEventListener('click', async () => {
-    installPrompt.classList.remove('show');
-    if (!deferredPrompt) return;
-
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    console.log('[PWA] Результат установки:', outcome);
-    deferredPrompt = null;
-  });
-
-  btnDismiss.addEventListener('click', () => {
-    installPrompt.classList.remove('show');
-    localStorage.setItem(DISMISS_KEY, String(Date.now()));
-  });
-
-  window.addEventListener('appinstalled', () => {
-    installPrompt.classList.remove('show');
-    deferredPrompt = null;
-    console.log('[PWA] Приложение установлено');
-  });
-
-  // ---------- Обработка параметра ?new=1 ----------
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('new') === '1') {
-    console.log('[PWA] Запуск через ярлык "Новый персонаж"');
-  }
-})();
-</script>
-</body>
-</html>
+    grid-template-column
