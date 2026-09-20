@@ -8,11 +8,21 @@
     const bindingModal = document.getElementById('modal-binding');
     const bindingList = document.getElementById('binding-list');
     const bindingSearch = document.getElementById('binding-search');
+    const bindingSlotsBar = document.getElementById('binding-slots-bar');
 
     let currentAttrId = null;
     let currentSlotIndex = 0;
+    let renderScheduled = false;
 
-    // ============ Рендер модулей и атрибутов ============
+    function scheduleRender() {
+      if (renderScheduled) return;
+      renderScheduled = true;
+      requestAnimationFrame(() => {
+        renderScheduled = false;
+        render();
+      });
+    }
+
     function render() {
       list.innerHTML = '';
       const schema = attributes.getSchema();
@@ -22,7 +32,6 @@
         modEl.className = 'attr-module';
         modEl.style.borderLeftColor = mod.color || '#4a7cff';
 
-        // Заголовок модуля
         const header = document.createElement('div');
         header.className = 'attr-module-header';
         header.style.background = mod.color || '#4a7cff';
@@ -46,7 +55,7 @@
           const label = prompt('Название атрибута:', 'Новый атрибут');
           if (label === null) return;
           attributes.addAttribute(mod.id, label);
-          render();
+          scheduleRender();
         });
         actions.appendChild(addBtn);
 
@@ -57,19 +66,17 @@
         delBtn.addEventListener('click', () => {
           if (!confirm(`Удалить модуль "${mod.name}"?`)) return;
           attributes.removeModule(mod.id);
-          render();
+          scheduleRender();
         });
         actions.appendChild(delBtn);
 
         header.appendChild(actions);
         modEl.appendChild(header);
 
-        // Строки атрибутов
         for (const row of mod.rows) {
           const rowEl = document.createElement('div');
           rowEl.className = 'attr-row';
 
-          // Название
           const label = document.createElement('input');
           label.className = 'attr-row-label';
           label.value = row.label;
@@ -78,19 +85,18 @@
           });
           rowEl.appendChild(label);
 
-          // Значение
           const valueInput = document.createElement('input');
           valueInput.className = 'attr-row-value';
           valueInput.value = row.value || '';
           valueInput.placeholder = '—';
           valueInput.dataset.attrId = row.id;
+          // НЕ на change, а на blur + Enter — чтобы не дёргать на каждый символ
           valueInput.addEventListener('change', () => {
             attributes.setAttributeValue(row.id, valueInput.value);
             updateBindingIndicators();
           });
           rowEl.appendChild(valueInput);
 
-          // Индикатор привязок
           const bindings = attributes.getAllBindingsForAttr(row.id);
           const bindBadge = document.createElement('button');
           bindBadge.className = 'attr-bind-badge' +
@@ -102,14 +108,13 @@
           });
           rowEl.appendChild(bindBadge);
 
-          // Удаление атрибута
           const delBtn2 = document.createElement('button');
           delBtn2.className = 'attr-icon-btn small';
           delBtn2.textContent = '×';
           delBtn2.addEventListener('click', () => {
             if (!confirm(`Удалить атрибут "${row.label}"?`)) return;
             attributes.removeAttribute(mod.id, row.id);
-            render();
+            scheduleRender();
           });
           rowEl.appendChild(delBtn2);
 
@@ -121,7 +126,6 @@
     }
 
     function updateBindingIndicators() {
-      const schema = attributes.getSchema();
       const inputs = list.querySelectorAll('.attr-row-value');
       inputs.forEach(inp => {
         const attrId = inp.dataset.attrId;
@@ -134,7 +138,6 @@
       });
     }
 
-    // ============ Редактор привязок ============
     function openBindingEditor(attrId, slotIndex) {
       currentAttrId = attrId;
       currentSlotIndex = slotIndex || 0;
@@ -145,8 +148,35 @@
       document.getElementById('binding-attr-name').textContent = attrData.row.label;
       bindingSearch.value = '';
 
+      renderSlotBar();
       renderBindingList();
       bindingModal.classList.add('open');
+    }
+
+    function renderSlotBar() {
+      const attrData = attributes.getAttribute(currentAttrId);
+      if (!attrData) return;
+      const slots = attrData.row.slots || 1;
+
+      bindingSlotsBar.innerHTML = '';
+      if (slots <= 1) {
+        bindingSlotsBar.style.display = 'none';
+        return;
+      }
+      bindingSlotsBar.style.display = 'flex';
+
+      for (let i = 0; i < slots; i++) {
+        const btn = document.createElement('button');
+        btn.className = 'slot-btn' + (i === currentSlotIndex ? ' active' : '');
+        const b = attributes.getBinding(currentAttrId, i);
+        btn.textContent = b ? `Слот ${i + 1} •` : `Слот ${i + 1}`;
+        btn.addEventListener('click', () => {
+          currentSlotIndex = i;
+          renderSlotBar();
+          renderBindingList();
+        });
+        bindingSlotsBar.appendChild(btn);
+      }
     }
 
     function renderBindingList() {
@@ -154,12 +184,17 @@
       const query = bindingSearch.value.trim().toLowerCase();
       bindingList.innerHTML = '';
 
-      // Текущая привязка
       const current = attributes.getBinding(currentAttrId, currentSlotIndex);
 
-      // Показываем все категории с элементами
       for (const cat of state.categories) {
         if (cat.items.length === 0) continue;
+
+        const items = cat.items.filter(it => {
+          if (!query) return true;
+          return it.name.toLowerCase().includes(query);
+        });
+
+        if (items.length === 0) continue;
 
         const catEl = document.createElement('div');
         catEl.className = 'binding-category';
@@ -168,13 +203,6 @@
         catTitle.className = 'binding-category-title';
         catTitle.textContent = (cat.icon ? cat.icon + ' ' : '') + cat.name;
         catEl.appendChild(catTitle);
-
-        const items = cat.items.filter(it => {
-          if (!query) return true;
-          return it.name.toLowerCase().includes(query);
-        });
-
-        if (items.length === 0) continue;
 
         const grid = document.createElement('div');
         grid.className = 'binding-grid';
@@ -189,6 +217,7 @@
             const img = document.createElement('img');
             img.src = item.src;
             img.alt = item.name;
+            img.loading = 'lazy';
             card.appendChild(img);
           } else {
             card.textContent = item.name;
@@ -200,11 +229,15 @@
           card.appendChild(nameEl);
 
           card.addEventListener('click', () => {
-            // Привязываем
             attributes.bindAttribute(currentAttrId, cat.id, item.id, currentSlotIndex);
-            // Устанавливаем значение в поле = имя элемента
-            attributes.setAttributeValue(currentAttrId, item.name);
-            render();
+            // Тихо подставляем имя без полного обновления
+            const attrData = attributes.getAttribute(currentAttrId);
+            if (attrData) {
+              attrData.row.value = item.name;
+              // Обновляем только это поле в UI
+              const inp = list.querySelector(`.attr-row-value[data-attr-id="${currentAttrId}"]`);
+              if (inp) inp.value = item.name;
+            }
             closeBindingEditor();
             ctx.toast('Привязано: ' + item.name);
           });
@@ -216,20 +249,20 @@
         bindingList.appendChild(catEl);
       }
 
-      // Кнопка "снять привязку"
       const currentBindings = attributes.getAllBindingsForAttr(currentAttrId);
       if (currentBindings.length > 0) {
         const unlinkBtn = document.createElement('button');
         unlinkBtn.className = 'btn danger';
         unlinkBtn.style.marginTop = '16px';
         unlinkBtn.style.width = '100%';
-        unlinkBtn.textContent = '❌ Снять все привязки';
+        unlinkBtn.textContent = '❌ Снять все привязки атрибута';
         unlinkBtn.addEventListener('click', () => {
           for (const b of currentBindings) {
             attributes.unbindAttribute(currentAttrId, b.slotIndex);
           }
           attributes.setAttributeValue(currentAttrId, '');
-          render();
+          const inp = list.querySelector(`.attr-row-value[data-attr-id="${currentAttrId}"]`);
+          if (inp) inp.value = '';
           closeBindingEditor();
           ctx.toast('Привязки сняты');
         });
@@ -242,7 +275,6 @@
       currentAttrId = null;
     }
 
-    // ============ Публичный API ============
     function open() {
       render();
       modal.classList.add('open');
@@ -252,10 +284,13 @@
       modal.classList.remove('open');
     }
 
-    // Поиск по привязкам
-    bindingSearch.addEventListener('input', () => renderBindingList());
+    bindingSearch.addEventListener('input', () => {
+      // Дебаунс поиска
+      clearTimeout(bindingSearch._t);
+      bindingSearch._t = setTimeout(renderBindingList, 150);
+    });
 
-    return { open, close, render, updateBindingIndicators };
+    return { open, close, render, scheduleRender, updateBindingIndicators, closeBindingEditor };
   }
 
   global.createBindingsUI = createBindingsUI;
