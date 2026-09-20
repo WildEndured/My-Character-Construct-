@@ -12,18 +12,13 @@
     categories: [],
     activeItems: {},
     activeCategoryId: null,
+    attributes: null,
   };
 
   const view = {
-    scale: 1,
-    offsetX: 0,
-    offsetY: 0,
-    minScale: 0.05,
-    maxScale: 4,
-    gridOn: false,
-    checkerOn: false,
-    centerOn: false,
-    showTransparent: false,
+    scale: 1, offsetX: 0, offsetY: 0,
+    minScale: 0.05, maxScale: 4,
+    gridOn: false, checkerOn: false, centerOn: false,
   };
 
   let uid = 1;
@@ -96,6 +91,7 @@
       activeItems: state.activeItems,
       activeCategoryId: state.activeCategoryId,
       canvasBg: state.canvasBg,
+      attributes: state.attributes,
     };
   }
 
@@ -111,16 +107,30 @@
     state.activeItems = snap.activeItems;
     state.activeCategoryId = snap.activeCategoryId;
     state.canvasBg = snap.canvasBg;
+    if (snap.attributes && attributes) {
+      state.attributes = snap.attributes;
+      attributes.deserialize(snap.attributes);
+    }
     renderCategories();
     if (state.activeCategoryId) renderItems();
     renderer.invalidateAll();
     renderAll();
   }
 
-  // ============ Автосохранение (5 сек + хеш-проверка) ============
+  // ============ Атрибуты ============
+  const attributes = createAttributes({
+    getState: () => state,
+    setState: (s) => { state = s; },
+    toast,
+    commit,
+    invalidate: (catId) => renderer.invalidate(catId),
+  });
+
+  // ============ Автосохранение ============
   const autoSaver = Storage.createAutoSaver(() => {
     const clean = {
       ...state,
+      attributes: attributes.serialize(),
       categories: state.categories.map(cat => ({
         ...cat,
         items: cat.items.map(it => ({
@@ -199,7 +209,7 @@
     applyTransform();
   }
 
-  // ============ Жесты (pinch, pan, double-tap) ============
+  // ============ Жесты ============
   let touches = {};
   let lastDist = 0;
   let lastMid = { x: 0, y: 0 };
@@ -217,10 +227,8 @@
     if (ids.length === 1) {
       isPanning = true;
       panStart = {
-        x: touches[ids[0]].x,
-        y: touches[ids[0]].y,
-        offsetX: view.offsetX,
-        offsetY: view.offsetY,
+        x: touches[ids[0]].x, y: touches[ids[0]].y,
+        offsetX: view.offsetX, offsetY: view.offsetY,
       };
     } else if (ids.length === 2) {
       isPanning = false;
@@ -266,7 +274,6 @@
     if (ids.length === 0) {
       isPanning = false;
       lastDist = 0;
-
       const now = Date.now();
       const t = e.changedTouches[0];
       if (now - lastTapTime < 300) {
@@ -292,7 +299,6 @@
   canvasWrap.addEventListener('touchend', endTouch, { passive: false });
   canvasWrap.addEventListener('touchcancel', endTouch, { passive: false });
 
-  // Мышь
   let mouseDown = false;
   let mouseStart = { x: 0, y: 0 };
   let mouseOffsetStart = { x: 0, y: 0 };
@@ -324,7 +330,6 @@
       tab.className = 'cat-tab' + (cat.id === state.activeCategoryId ? ' active' : '');
       tab.dataset.id = cat.id;
 
-      // Кнопка видимости
       const vis = document.createElement('div');
       vis.className = 'visibility-btn' + (cat.visible === false ? ' off' : '');
       vis.textContent = cat.visible === false ? '○' : '●';
@@ -337,7 +342,6 @@
       });
       tab.appendChild(vis);
 
-      // Иконка категории
       if (cat.icon) {
         const icon = document.createElement('span');
         icon.className = 'cat-icon';
@@ -345,12 +349,10 @@
         tab.appendChild(icon);
       }
 
-      // Название
       const name = document.createElement('span');
       name.textContent = cat.name;
       tab.appendChild(name);
 
-      // Кнопка редактирования ✎
       const editBtn = document.createElement('div');
       editBtn.className = 'edit-btn';
       editBtn.textContent = '✎';
@@ -362,7 +364,6 @@
       });
       tab.appendChild(editBtn);
 
-      // Кнопка удаления
       const del = document.createElement('div');
       del.className = 'del-x';
       del.textContent = '×';
@@ -372,18 +373,14 @@
       });
       tab.appendChild(del);
 
-      // Бейдж (для режима редактирования)
       const badge = document.createElement('div');
       badge.className = 'edit-badge';
       badge.textContent = '✎';
       tab.appendChild(badge);
 
-      // === Обработчики ===
       let longPressTimer = null;
       let longPressFired = false;
-      let startX = 0;
-      let startY = 0;
-      let moved = false;
+      let startX = 0, startY = 0, moved = false;
 
       const cancelLongPress = () => {
         clearTimeout(longPressTimer);
@@ -392,13 +389,11 @@
 
       const onPointerStart = (e) => {
         if (e.target.closest('.del-x, .visibility-btn, .edit-btn')) return;
-
         longPressFired = false;
         moved = false;
         const touch = e.touches ? e.touches[0] : e;
         startX = touch.clientX;
         startY = touch.clientY;
-
         cancelLongPress();
         longPressTimer = setTimeout(() => {
           if (moved) return;
@@ -427,25 +422,19 @@
         openCategory(cat.id);
       };
 
-      const onPointerCancel = () => {
-        cancelLongPress();
-      };
-
       tab.addEventListener('touchstart', onPointerStart, { passive: true });
       tab.addEventListener('touchmove', onPointerMove, { passive: true });
       tab.addEventListener('touchend', onPointerEnd);
-      tab.addEventListener('touchcancel', onPointerCancel);
+      tab.addEventListener('touchcancel', cancelLongPress);
       tab.addEventListener('mousedown', onPointerStart);
       tab.addEventListener('mousemove', onPointerMove);
       tab.addEventListener('mouseup', onPointerEnd);
 
       attachCategoryDrag(tab, cat.id);
-
       categoriesEl.appendChild(tab);
     }
   }
 
-  // ============ Drag-and-drop категорий ============
   function attachCategoryDrag(tab, catId) {
     let dragging = false;
     let startX = 0;
@@ -463,10 +452,8 @@
 
     const onDragStart = (e) => {
       if (e.target.closest('.del-x, .visibility-btn, .edit-btn')) return;
-
       const touch = e.touches ? e.touches[0] : e;
       startX = touch.clientX;
-
       longPressDragTimer = setTimeout(() => {
         dragging = true;
         tab.classList.add('dragging');
@@ -482,64 +469,50 @@
         }
         return;
       }
-
       e.preventDefault();
-
       const target = getTabUnder(touch.clientX);
       if (currentTarget && currentTarget !== target) {
         currentTarget.classList.remove('drag-over-left', 'drag-over-right');
       }
       currentTarget = target;
-
       if (target) {
         const r = target.getBoundingClientRect();
         const mid = r.left + r.width / 2;
         target.classList.remove('drag-over-left', 'drag-over-right');
         target.classList.add(touch.clientX < mid ? 'drag-over-left' : 'drag-over-right');
       }
-
       const rect = categoriesEl.getBoundingClientRect();
-      if (touch.clientX < rect.left + 30) {
-        categoriesEl.scrollLeft -= 8;
-      } else if (touch.clientX > rect.right - 30) {
-        categoriesEl.scrollLeft += 8;
-      }
+      if (touch.clientX < rect.left + 30) categoriesEl.scrollLeft -= 8;
+      else if (touch.clientX > rect.right - 30) categoriesEl.scrollLeft += 8;
     };
 
     const onDragEnd = (e) => {
       clearTimeout(longPressDragTimer);
       if (!dragging) return;
-
       dragging = false;
       tab.classList.remove('dragging');
-
       const touch = e.changedTouches ? e.changedTouches[0] : e;
       const target = currentTarget || getTabUnder(touch.clientX);
-
       if (target) {
         const targetId = target.dataset.id;
         const fromIdx = state.categories.findIndex(c => c.id === catId);
         const toIdx = state.categories.findIndex(c => c.id === targetId);
-
         if (fromIdx >= 0 && toIdx >= 0 && fromIdx !== toIdx) {
           const r = target.getBoundingClientRect();
           const mid = r.left + r.width / 2;
           const insertAfter = touch.clientX >= mid;
-
           const [movedItem] = state.categories.splice(fromIdx, 1);
           let newIdx = toIdx;
           if (fromIdx < toIdx) newIdx--;
           if (insertAfter) newIdx++;
           newIdx = Math.max(0, Math.min(state.categories.length, newIdx));
           state.categories.splice(newIdx, 0, movedItem);
-
           renderer.invalidateAll();
           commit('reorder-categories');
           renderCategories();
           toast('Порядок изменён');
         }
       }
-
       if (currentTarget) {
         currentTarget.classList.remove('drag-over-left', 'drag-over-right');
         currentTarget = null;
@@ -561,20 +534,16 @@
   function openCategoryEdit(catId) {
     const cat = state.categories.find(c => c.id === catId);
     if (!cat) return;
-
     editingCategoryId = catId;
-
     document.getElementById('cat-edit-name').value = cat.name;
     document.getElementById('cat-edit-icon').value = cat.icon || '';
     updateCategoryEditPosition();
-
     document.getElementById('modal-cat-edit').classList.add('open');
     setTimeout(() => {
       const inp = document.getElementById('cat-edit-name');
       inp.focus();
       inp.select();
     }, 50);
-
     const tab = categoriesEl.querySelector(`.cat-tab[data-id="${catId}"]`);
     if (tab) tab.classList.add('edit-mode');
   }
@@ -596,10 +565,8 @@
     if (idx < 0) return;
     const newIdx = idx + direction;
     if (newIdx < 0 || newIdx >= state.categories.length) return;
-
     const [moved] = state.categories.splice(idx, 1);
     state.categories.splice(newIdx, 0, moved);
-
     renderer.invalidateAll();
     renderCategories();
     updateCategoryEditPosition();
@@ -610,25 +577,19 @@
     if (!editingCategoryId) return;
     const cat = state.categories.find(c => c.id === editingCategoryId);
     if (!cat) return;
-
     const newName = document.getElementById('cat-edit-name').value.trim();
     const newIcon = document.getElementById('cat-edit-icon').value.trim();
-
     if (!newName) {
       toast('Введите название', 'error');
       return;
     }
-
     const changed = cat.name !== newName || (cat.icon || '') !== newIcon;
-
     cat.name = newName;
     cat.icon = newIcon || undefined;
-
     if (changed) {
       commit('rename-category');
       toast('Категория обновлена', 'success');
     }
-
     closeCategoryEdit();
   }
 
@@ -647,12 +608,9 @@
     itemsPanel.classList.add('open');
     const cat = state.categories.find(c => c.id === catId);
     itemsTitle.textContent = cat ? cat.name : '';
-
     requestAnimationFrame(() => {
       const tab = categoriesEl.querySelector(`.cat-tab[data-id="${catId}"]`);
-      if (tab) {
-        tab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-      }
+      if (tab) tab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     });
   }
 
@@ -745,10 +703,8 @@
       const file = files[i];
       updateProgress((i / files.length) * 100, `Загрузка ${i + 1}/${files.length}`);
       await nextFrame();
-
       const src = await readFileAsDataURL(file);
       const img = await Exporter.loadImage(src);
-
       const item = {
         id: nextId(),
         name: file.name.replace(/\.[^.]+$/, '') || baseName || 'Элемент',
@@ -855,9 +811,7 @@
       actions.appendChild(downBtn);
 
       row.appendChild(actions);
-
       attachLayerDragHandlers(row, cat.id);
-
       layersList.appendChild(row);
     }
   }
@@ -924,11 +878,11 @@
     row.addEventListener('touchmove', onMove, { passive: false });
     row.addEventListener('touchend', onEnd);
     row.addEventListener('mousedown', onStart);
-    window.addEventListener('mousemove', (e) => { if (dragging) onMove(e); });
-    window.addEventListener('mouseup', onEnd);
+    row.addEventListener('mousemove', (e) => { if (dragging) onMove(e); });
+    row.addEventListener('mouseup', onEnd);
   }
 
-  // ============ Импорт / Экспорт ============
+  // ============ Экспорт ============
   function openExportModal() {
     document.getElementById('modal-export').classList.add('open');
   }
@@ -944,22 +898,18 @@
           activeItems: state.activeItems,
           canvasBg: transparent ? null : state.canvasBg,
         });
-
         updateProgress(40, 'Масштабирование…');
         await nextFrame();
         const resized = Exporter.resizeCanvas(composite, size);
-
         updateProgress(70, 'Кодирование PNG…');
         await nextFrame();
         const blob = await Exporter.canvasToPngWithDpi(resized, Exporter.DPI);
-
         updateProgress(95);
         Exporter.download(blob, `character_${size}x${size}_300dpi.png`);
         toast('PNG экспортирован', 'success');
       } else if (format === 'psd') {
         updateProgress(20, 'Сбор слоёв…');
         await nextFrame();
-
         const layers = [];
         if (!transparent) {
           const bg = document.createElement('canvas');
@@ -970,14 +920,12 @@
           bgx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
           layers.push({ name: 'Фон', canvas: bg });
         }
-
         for (const cat of state.categories) {
           if (cat.visible === false) continue;
           const activeId = state.activeItems[cat.id];
           if (!activeId) continue;
           const item = cat.items.find(i => i.id === activeId);
           if (!item || !item.img) continue;
-
           const lc = document.createElement('canvas');
           lc.width = CANVAS_SIZE;
           lc.height = CANVAS_SIZE;
@@ -985,10 +933,8 @@
           drawItemWithTransform(lx, item);
           layers.push({ name: cat.name, canvas: lc });
         }
-
         updateProgress(60, 'Кодирование PSD…');
         await nextFrame();
-
         const blob = await Exporter.buildPSD(layers, CANVAS_SIZE, CANVAS_SIZE);
         updateProgress(95);
         Exporter.download(blob, 'character.psd');
@@ -996,6 +942,7 @@
       } else if (format === 'json') {
         const json = Exporter.serializeProject({
           ...state,
+          attributes: attributes.serialize(),
           categories: state.categories,
         });
         const blob = new Blob([json], { type: 'application/json' });
@@ -1033,16 +980,34 @@
     loadState: (newState) => {
       state = { ...newState };
       renderer.invalidateAll();
+      if (state.attributes) {
+        attributes.deserialize(state.attributes);
+      }
       renderCategories();
       if (state.activeCategoryId) openCategory(state.activeCategoryId);
       else itemsPanel.classList.remove('open');
       history.reset(snapshot());
       renderAll();
+      // Применяем привязки
+      setTimeout(() => attributes.applyAllBindings(), 300);
       autoSaver.schedule();
     },
     toast,
     confirm: confirmDialog,
   });
+
+  // ============ Bindings UI ============
+  let bindingsUI = null;
+
+  function getBindingsUI() {
+    if (!bindingsUI) {
+      bindingsUI = createBindingsUI(attributes, {
+        getState: () => state,
+        toast,
+      });
+    }
+    return bindingsUI;
+  }
 
   // ============ Модальные окна ============
   function setupModals() {
@@ -1058,9 +1023,8 @@
     });
   }
 
-  // ============ Инициализация UI ============
+  // ============ UI ============
   function bindUI() {
-    // Undo/Redo
     document.getElementById('btn-undo').addEventListener('click', () => {
       const s = history.undo();
       if (s) restoreFromSnapshot(s);
@@ -1080,6 +1044,20 @@
       }
     });
 
+    // Атрибуты
+    document.getElementById('btn-attributes').addEventListener('click', () => {
+      getBindingsUI().open();
+    });
+    document.getElementById('attr-add-module').addEventListener('click', () => {
+      const name = prompt('Название модуля:', 'Новый модуль');
+      if (name === null) return;
+      attributes.addModule(name);
+      getBindingsUI().render();
+    });
+    document.getElementById('binding-cancel').addEventListener('click', () => {
+      document.getElementById('modal-binding').classList.remove('open');
+    });
+
     // Галерея
     document.getElementById('btn-gallery').addEventListener('click', () => gallery.open());
     document.getElementById('gallery-new').addEventListener('click', async () => {
@@ -1096,10 +1074,8 @@
       document.getElementById('modal-import').classList.add('open');
     });
 
-    // Слои
     document.getElementById('btn-layers').addEventListener('click', openLayers);
 
-    // Новая категория
     document.getElementById('btn-add-cat').addEventListener('click', () => {
       document.getElementById('cat-name').value = '';
       document.getElementById('modal-cat').classList.add('open');
@@ -1112,7 +1088,6 @@
       document.getElementById('modal-cat').classList.remove('open');
     });
 
-    // Добавить элемент
     document.getElementById('item-save').addEventListener('click', async () => {
       const catId = state.activeCategoryId;
       const files = document.getElementById('item-file').files;
@@ -1125,11 +1100,9 @@
       await addItemsFromFiles(catId, files, name);
     });
 
-    // Экспорт
     document.getElementById('btn-export').addEventListener('click', openExportModal);
     setupExportModal();
 
-    // Импорт
     document.getElementById('btn-import').addEventListener('click', () => {
       document.getElementById('import-file').value = '';
       document.getElementById('modal-import').classList.add('open');
@@ -1145,7 +1118,6 @@
       }
     });
 
-    // Новый проект
     document.getElementById('btn-new').addEventListener('click', async () => {
       if (!await confirmDialog('Создать нового персонажа? Текущий сохранится в галерее.')) return;
       const name = prompt('Название персонажа:', 'Персонаж');
@@ -1157,6 +1129,8 @@
       state.id = proj.id;
       state.name = proj.name;
       state.canvasBg = '#ffffff';
+      state.attributes = null;
+      attributes.deserialize(null);
       renderer.invalidateAll();
       renderCategories();
       itemsPanel.classList.remove('open');
@@ -1165,12 +1139,10 @@
       toast('Новый персонаж создан');
     });
 
-    // Закрыть панель
     document.getElementById('btn-close-items').addEventListener('click', () => {
       itemsPanel.classList.remove('open');
     });
 
-    // Зум
     document.getElementById('zoom-in').addEventListener('click', () => setScale(view.scale * 1.25));
     document.getElementById('zoom-out').addEventListener('click', () => setScale(view.scale * 0.8));
     document.getElementById('zoom-100').addEventListener('click', () => {
@@ -1180,7 +1152,6 @@
     });
     document.getElementById('zoom-fit').addEventListener('click', fitToScreen);
 
-    // Инструменты
     document.getElementById('tool-grid').addEventListener('click', (e) => {
       view.gridOn = !view.gridOn;
       e.currentTarget.classList.toggle('active', view.gridOn);
@@ -1197,29 +1168,20 @@
       applyTransform();
     });
 
-    // Редактирование категории
     const saveBtn = document.getElementById('cat-edit-save');
     if (saveBtn) saveBtn.addEventListener('click', saveCategoryEdit);
-
     const leftBtn = document.getElementById('cat-edit-left');
     if (leftBtn) leftBtn.addEventListener('click', () => moveCategoryBy(-1));
-
     const rightBtn = document.getElementById('cat-edit-right');
     if (rightBtn) rightBtn.addEventListener('click', () => moveCategoryBy(+1));
-
     const nameInput = document.getElementById('cat-edit-name');
     if (nameInput) {
       nameInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          saveCategoryEdit();
-        }
+        if (e.key === 'Enter') { e.preventDefault(); saveCategoryEdit(); }
       });
     }
-
     const closeBtn = document.querySelector('#modal-cat-edit [data-close]');
     if (closeBtn) closeBtn.addEventListener('click', closeCategoryEdit);
-
     const editModal = document.getElementById('modal-cat-edit');
     if (editModal) {
       editModal.addEventListener('click', (e) => {
@@ -1228,7 +1190,6 @@
     }
   }
 
-  // ============ Модалка экспорта ============
   let exportFormat = 'png';
   let exportSize = 4096;
 
@@ -1244,7 +1205,6 @@
         document.getElementById('export-json-opts').style.display = exportFormat === 'json' ? '' : 'none';
       });
     });
-
     const sizePresets = document.querySelectorAll('#export-size-presets .export-preset');
     sizePresets.forEach(p => {
       p.addEventListener('click', () => {
@@ -1253,7 +1213,6 @@
         exportSize = parseInt(p.dataset.size, 10);
       });
     });
-
     document.getElementById('export-confirm').addEventListener('click', async () => {
       const transparent = document.getElementById('export-transparent').checked;
       document.getElementById('modal-export').classList.remove('open');
@@ -1261,7 +1220,6 @@
     });
   }
 
-  // ============ Открытие модалки элемента ============
   function openModalItem(catId) {
     document.getElementById('item-name').value = '';
     document.getElementById('item-file').value = '';
@@ -1299,7 +1257,6 @@
     window.addEventListener('resize', () => applyTransform());
     window.addEventListener('orientationchange', () => setTimeout(applyTransform, 300));
 
-    // Принудительное сохранение при сворачивании приложения
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') {
         autoSaver.flush();
