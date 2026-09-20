@@ -1,16 +1,14 @@
-/* renderer.js — рендер холста + кэш слоёв */
+/* renderer.js — безопасная версия с LRU-кэшем */
 (function(global) {
   'use strict';
 
   const CANVAS_SIZE = 4096;
+  const MAX_CACHE = 6;
 
   function createRenderer(canvas) {
-    const ctx = canvas.getContext('2d', { alpha: true });
-
-    // Кэш: Map<categoryId, {canvas, dirty, lastActiveId, lastOpacity, lastTransform}>
+    const ctx = canvas.getContext('2d', { alpha: true, willReadFrequently: false });
     const layerCache = new Map();
-
-    // Финальный композит-буфер
+    const layerOrder = [];
     let composeCanvas = null;
     let composeCtx = null;
 
@@ -23,21 +21,43 @@
       }
     }
 
+    function releaseCanvas(c) {
+      if (!c) return;
+      c.width = 0;
+      c.height = 0;
+    }
+
     function getLayerCanvas(catId) {
       let entry = layerCache.get(catId);
-      if (!entry) {
-        const c = document.createElement('canvas');
-        c.width = CANVAS_SIZE;
-        c.height = CANVAS_SIZE;
-        entry = {
-          canvas: c,
-          ctx: c.getContext('2d'),
-          dirty: true,
-          lastActiveId: null,
-          lastTransform: null,
-        };
-        layerCache.set(catId, entry);
+      if (entry) {
+        const idx = layerOrder.indexOf(catId);
+        if (idx >= 0) {
+          layerOrder.splice(idx, 1);
+          layerOrder.push(catId);
+        }
+        return entry;
       }
+      // LRU-вытеснение
+      while (layerCache.size >= MAX_CACHE && layerOrder.length > 0) {
+        const oldId = layerOrder.shift();
+        const oldEntry = layerCache.get(oldId);
+        if (oldEntry) {
+          releaseCanvas(oldEntry.canvas);
+          layerCache.delete(oldId);
+        }
+      }
+      const c = document.createElement('canvas');
+      c.width = CANVAS_SIZE;
+      c.height = CANVAS_SIZE;
+      entry = {
+        canvas: c,
+        ctx: c.getContext('2d'),
+        dirty: true,
+        lastActiveId: null,
+        lastTransformKey: '',
+      };
+      layerCache.set(catId, entry);
+      layerOrder.push(catId);
       return entry;
     }
 
@@ -46,22 +66,26 @@
         const entry = layerCache.get(catId);
         if (entry) entry.dirty = true;
       } else {
-        layerCache.forEach(e => e.dirty = true);
+        layerCache.forEach(e => { e.dirty = true; });
       }
     }
 
     function invalidateAll() {
+      for (const [, entry] of layerCache) {
+        releaseCanvas(entry.canvas);
+      }
       layerCache.clear();
+      layerOrder.length = 0;
+      if (composeCanvas) {
+        releaseCanvas(composeCanvas);
+        composeCanvas = null;
+        composeCtx = null;
+      }
     }
 
-    /**
-     * Главный рендер.
-     * @param {Object} state — {categories, activeItems, canvasBg}
-     */
     function render(state) {
       ensureCompose();
 
-      // 1) Собираем активные слои в порядке categories
       const activeLayers = [];
       for (const cat of state.categories) {
         if (cat.visible === false) continue;
@@ -73,19 +97,16 @@
         }
       }
 
-      // 2) Обновляем кэш только для изменившихся слоёв
+      // Обновляем кэш только для изменившихся слоёв
       for (const { cat, item } of activeLayers) {
         const entry = getLayerCanvas(cat.id);
         const transform = item.transform || null;
         const transformKey = transform ? JSON.stringify(transform) : '';
-
-        if (entry.lastActiveId !== item.id ||
-            entry.lastTransformKey !== transformKey) {
+        if (entry.lastActiveId !== item.id || entry.lastTransformKey !== transformKey) {
           entry.dirty = true;
           entry.lastActiveId = item.id;
           entry.lastTransformKey = transformKey;
         }
-
         if (entry.dirty) {
           entry.ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
           drawItem(entry.ctx, item, transform);
@@ -93,21 +114,24 @@
         }
       }
 
-      // 3) Удаляем кэш для неиспользуемых/невидимых слоёв
-      for (const [catId, entry] of layerCache) {
+      // Удаляем из кэша слои, которые больше не активны
+      for (const [catId] of layerCache) {
         const cat = state.categories.find(c => c.id === catId);
         if (!cat || cat.visible === false || !state.activeItems[catId]) {
+          const entry = layerCache.get(catId);
+          if (entry) releaseCanvas(entry.canvas);
           layerCache.delete(catId);
+          const idx = layerOrder.indexOf(catId);
+          if (idx >= 0) layerOrder.splice(idx, 1);
         }
       }
 
-      // 4) Финальная композиция
+      // Финальная композиция
       composeCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
       if (state.canvasBg) {
         composeCtx.fillStyle = state.canvasBg;
         composeCtx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
       }
-
       for (const { cat } of activeLayers) {
         const entry = layerCache.get(cat.id);
         if (!entry) continue;
@@ -116,7 +140,6 @@
       }
       composeCtx.globalAlpha = 1;
 
-      // 5) Переносим на видимый холст
       ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
       ctx.drawImage(composeCanvas, 0, 0);
     }
@@ -124,20 +147,11 @@
     function drawItem(context, item, transform) {
       const img = item.img;
       if (!img) return;
-
       if (!transform) {
         context.drawImage(img, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
         return;
       }
-
-      const {
-        x = 0, y = 0,
-        scale = 1,
-        rotation = 0,
-        flipX = false,
-        flipY = false,
-      } = transform;
-
+      const { x = 0, y = 0, scale = 1, rotation = 0, flipX = false, flipY = false } = transform;
       context.save();
       context.translate(CANVAS_SIZE / 2 + x, CANVAS_SIZE / 2 + y);
       context.rotate(rotation);
@@ -146,30 +160,24 @@
       context.restore();
     }
 
-    /**
-     * Быстрый экспорт композита как canvas (для экспорта без перерисовки).
-     */
     function getComposite(state) {
       render(state);
       ensureCompose();
       return composeCanvas;
     }
 
-    /**
-     * Экспорт отдельного слоя (для PSD).
-     */
     function getLayerCanvasForExport(catId) {
       const entry = layerCache.get(catId);
       return entry ? entry.canvas : null;
     }
 
+    function dispose() {
+      invalidateAll();
+    }
+
     return {
-      render,
-      invalidate,
-      invalidateAll,
-      getComposite,
-      getLayerCanvasForExport,
-      CANVAS_SIZE,
+      render, invalidate, invalidateAll, getComposite,
+      getLayerCanvasForExport, dispose, CANVAS_SIZE,
     };
   }
 
