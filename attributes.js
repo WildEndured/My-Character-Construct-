@@ -1,8 +1,7 @@
-/* attributes.js — система атрибутов и привязок атрибут → элемент */
+/* attributes.js — система атрибутов и привязок (без рекурсивных коммитов) */
 (function(global) {
   'use strict';
 
-  // ============ Схема по умолчанию ============
   const DEFAULT_SCHEMA = {
     modules: [
       {
@@ -63,7 +62,6 @@
         ],
       },
     ],
-    // Привязки: attributeId → { categoryId, itemId }
     bindings: {},
   };
 
@@ -71,22 +69,26 @@
     return JSON.parse(JSON.stringify(obj));
   }
 
-  // ============ Публичный API ============
+  function normalizeName(str) {
+    return String(str || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[\s_\-]+/g, '');
+  }
+
   function createAttributes(ctx) {
-    // ctx = { getState, setState, renderAll, toast, commit }
     let schema = clone(DEFAULT_SCHEMA);
 
-    // Загружаем из основного state
+    function saveToState() {
+      const state = ctx.getState();
+      state.attributes = clone(schema);
+    }
+
     function loadFromState() {
       const state = ctx.getState();
       if (state.attributes) {
         schema = clone(state.attributes);
       }
-    }
-
-    function saveToState() {
-      const state = ctx.getState();
-      state.attributes = clone(schema);
     }
 
     // ============ Модули ============
@@ -99,21 +101,22 @@
       };
       schema.modules.push(mod);
       saveToState();
-      ctx.commit('add-module');
+      ctx.onDataChanged?.('add-module');
       return mod;
     }
 
     function removeModule(moduleId) {
+      const mod = schema.modules.find(m => m.id === moduleId);
+      if (!mod) return;
+      const attrIds = mod.rows.map(r => r.id);
       schema.modules = schema.modules.filter(m => m.id !== moduleId);
-      // Удаляем привязки, связанные с этим модулем
-      for (const rowId of Object.keys(schema.bindings)) {
-        const belongs = !schema.modules.some(m =>
-          m.rows.some(r => r.id === rowId)
-        );
-        if (belongs) delete schema.bindings[rowId];
+      for (const attrId of attrIds) {
+        for (const slot of [0, 1, 2]) {
+          delete schema.bindings[attrId + '#' + slot];
+        }
       }
       saveToState();
-      ctx.commit('remove-module');
+      ctx.onDataChanged?.('remove-module');
     }
 
     function renameModule(moduleId, name) {
@@ -121,11 +124,11 @@
       if (mod) {
         mod.name = name;
         saveToState();
-        ctx.commit('rename-module');
+        ctx.onDataChanged?.('rename-module');
       }
     }
 
-    // ============ Атрибуты (строки) ============
+    // ============ Атрибуты ============
     function addAttribute(moduleId, label) {
       const mod = schema.modules.find(m => m.id === moduleId);
       if (!mod) return;
@@ -137,7 +140,7 @@
       };
       mod.rows.push(row);
       saveToState();
-      ctx.commit('add-attribute');
+      ctx.onDataChanged?.('add-attribute');
       return row;
     }
 
@@ -145,9 +148,11 @@
       const mod = schema.modules.find(m => m.id === moduleId);
       if (!mod) return;
       mod.rows = mod.rows.filter(r => r.id !== attrId);
-      delete schema.bindings[attrId];
+      for (const slot of [0, 1, 2]) {
+        delete schema.bindings[attrId + '#' + slot];
+      }
       saveToState();
-      ctx.commit('remove-attribute');
+      ctx.onDataChanged?.('remove-attribute');
     }
 
     function renameAttribute(moduleId, attrId, label) {
@@ -157,20 +162,20 @@
       if (row) {
         row.label = label;
         saveToState();
-        ctx.commit('rename-attribute');
+        ctx.onDataChanged?.('rename-attribute');
       }
     }
 
-    // ============ Значения (значение из таблицы) ============
+    // ============ Значения ============
     function setAttributeValue(attrId, value) {
       for (const mod of schema.modules) {
         const row = mod.rows.find(r => r.id === attrId);
         if (row) {
           row.value = value;
           saveToState();
-          ctx.commit('set-attribute-value');
-          // Применяем привязки автоматически
-          applyBindings(attrId);
+          // Применяем привязки — но БЕЗ коммита истории
+          applyBindingsSilent(attrId);
+          ctx.onDataChanged?.('set-attribute-value');
           return;
         }
       }
@@ -185,20 +190,13 @@
     }
 
     // ============ Привязки ============
-    /**
-     * Привязать атрибут к элементу в категории
-     * @param {string} attrId — id строки в модуле
-     * @param {string} categoryId — id категории в редакторе
-     * @param {string} itemId — id элемента
-     * @param {number} slotIndex — индекс слота (0..slots-1)
-     */
     function bindAttribute(attrId, categoryId, itemId, slotIndex) {
       if (slotIndex === undefined) slotIndex = 0;
       const key = attrId + '#' + slotIndex;
       schema.bindings[key] = { attrId, categoryId, itemId, slotIndex };
       saveToState();
-      ctx.commit('bind-attribute');
-      applyBindings(attrId);
+      applyBindingsSilent(attrId);
+      ctx.onDataChanged?.('bind-attribute');
     }
 
     function unbindAttribute(attrId, slotIndex) {
@@ -206,7 +204,7 @@
       const key = attrId + '#' + slotIndex;
       delete schema.bindings[key];
       saveToState();
-      ctx.commit('unbind-attribute');
+      ctx.onDataChanged?.('unbind-attribute');
     }
 
     function getBinding(attrId, slotIndex) {
@@ -222,57 +220,94 @@
       return result;
     }
 
-    /**
-     * Применить привязки к state — установить активные элементы.
-     * Логика:
-     * 1. Если у атрибута есть значение (например "cat tail")
-     * 2. Ищем элемент с таким именем (или id) в категории из привязки
-     * 3. Активируем его
-     */
-    function applyBindings(attrId) {
+    // Найти элемент по значению
+    function findItemForValue(cat, value) {
+      if (!value) return null;
+      const target = value.trim();
+      const normTarget = normalizeName(target);
+      let found = cat.items.find(it => it.id.toLowerCase() === target.toLowerCase());
+      if (!found) found = cat.items.find(it => normalizeName(it.name) === normTarget);
+      if (!found) {
+        found = cat.items.find(it =>
+          normalizeName(it.name).includes(normTarget) ||
+          normTarget.includes(normalizeName(it.name))
+        );
+      }
+      return found;
+    }
+
+    // Тихая версия: НЕ вызывает commit, только помечает слои
+    function applyBindingsSilent(attrId) {
       const state = ctx.getState();
       const attrData = getAttribute(attrId);
-      if (!attrData) return;
+      if (!attrData) return { changed: false };
 
       const { row } = attrData;
       const bindings = getAllBindingsForAttr(attrId);
+      const changedCats = new Set();
 
       for (const binding of bindings) {
         const cat = state.categories.find(c => c.id === binding.categoryId);
         if (!cat) continue;
 
-        // Ищем элемент по имени (case-insensitive) или по id
-        const targetValue = (row.value || '').trim().toLowerCase();
-        if (!targetValue) {
-          // Пустое значение → снять активный элемент
+        if (!row.value) {
           if (state.activeItems[cat.id]) {
             delete state.activeItems[cat.id];
+            changedCats.add(cat.id);
           }
           continue;
         }
 
-        const foundItem = cat.items.find(it =>
-          it.id.toLowerCase() === targetValue ||
-          it.name.toLowerCase() === targetValue
-        );
-
-        if (foundItem) {
+        const foundItem = findItemForValue(cat, row.value);
+        if (foundItem && state.activeItems[cat.id] !== foundItem.id) {
           state.activeItems[cat.id] = foundItem.id;
+          changedCats.add(cat.id);
         }
       }
 
-      ctx.commit('apply-bindings');
+      if (changedCats.size > 0) {
+        for (const catId of changedCats) {
+          ctx.invalidate?.(catId);
+        }
+        ctx.onBindingsChanged?.(changedCats);
+      }
+      return { changed: changedCats.size > 0 };
     }
 
-    /**
-     * Применить ВСЕ привязки (после загрузки проекта)
-     */
+    // Публичная версия — используется кнопкой "Применить"
+    function applyBindings(attrId) {
+      const { changed } = applyBindingsSilent(attrId);
+      if (changed) ctx.onDataChanged?.('apply-bindings');
+    }
+
+    // Массовое применение — ОДИН рендер в конце
     function applyAllBindings() {
+      const state = ctx.getState();
+      const changedCats = new Set();
+
       for (const mod of schema.modules) {
         for (const row of mod.rows) {
-          if (row.value) applyBindings(row.id);
+          if (!row.value) continue;
+          const bindings = getAllBindingsForAttr(row.id);
+          for (const binding of bindings) {
+            const cat = state.categories.find(c => c.id === binding.categoryId);
+            if (!cat) continue;
+            const foundItem = findItemForValue(cat, row.value);
+            if (foundItem && state.activeItems[cat.id] !== foundItem.id) {
+              state.activeItems[cat.id] = foundItem.id;
+              changedCats.add(cat.id);
+            }
+          }
         }
       }
+
+      if (changedCats.size > 0) {
+        for (const catId of changedCats) {
+          ctx.invalidate?.(catId);
+        }
+        ctx.onBindingsChanged?.(changedCats);
+      }
+      return changedCats.size;
     }
 
     // ============ Сериализация ============
@@ -281,38 +316,32 @@
     }
 
     function deserialize(data) {
-      if (!data) return;
+      if (!data || !data.modules) {
+        schema = clone(DEFAULT_SCHEMA);
+        return;
+      }
       schema = clone(data);
-      saveToState();
     }
 
     function getSchema() {
       return schema;
     }
 
+    function reset() {
+      schema = clone(DEFAULT_SCHEMA);
+      saveToState();
+    }
+
     return {
-      // Модули
-      addModule,
-      removeModule,
-      renameModule,
-      // Атрибуты
-      addAttribute,
-      removeAttribute,
-      renameAttribute,
-      // Значения
-      setAttributeValue,
-      getAttribute,
-      // Привязки
-      bindAttribute,
-      unbindAttribute,
-      getBinding,
-      getAllBindingsForAttr,
-      applyBindings,
-      applyAllBindings,
-      // Данные
-      getSchema,
-      serialize,
-      deserialize,
+      addModule, removeModule, renameModule,
+      addAttribute, removeAttribute, renameAttribute,
+      setAttributeValue, getAttribute,
+      bindAttribute, unbindAttribute,
+      getBinding, getAllBindingsForAttr,
+      applyBindings, applyAllBindings,
+      getSchema, serialize, deserialize,
+      loadFromState, reset,
+      normalizeName,
     };
   }
 
