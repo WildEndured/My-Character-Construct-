@@ -588,23 +588,85 @@
   }
 
   /* ===== Атрибуты ===== */
-  #modal-attributes .modal { max-width: 800px; }
+  #modal-attributes .modal { max-width: 900px; padding: 14px; }
   #modal-category-picker .modal { max-width: 700px; }
+
+  .attr-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .attr-modal-header h3 {
+    margin: 0;
+    flex: 1 1 auto;
+    font-size: 16px;
+  }
+  .attr-modal-header input[type="text"] {
+    flex: 1 1 180px;
+    min-width: 140px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+  .attr-modal-header .btn {
+    min-height: 38px;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .attr-progress-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 4px 12px;
+    font-size: 12px;
+    color: #aaa;
+  }
+  .attr-progress-track {
+    flex: 1;
+    height: 6px;
+    background: #1a1a1a;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .attr-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4a7cff, #6a9cff);
+    width: 0%;
+    transition: width 0.3s;
+  }
 
   .attr-module {
     background: #2f2f2f;
     border-left: 4px solid #4a7cff;
     border-radius: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
     overflow: hidden;
   }
 
   .attr-module-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     padding: 8px 10px;
     gap: 6px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .attr-collapse-icon {
+    font-size: 12px;
+    color: rgba(255,255,255,0.7);
+    width: 16px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .attr-collapse-icon.small { font-size: 10px; width: 14px; }
+
+  .attr-module-icon {
+    font-size: 18px;
+    line-height: 1;
+    flex-shrink: 0;
   }
 
   .attr-module-title {
@@ -616,65 +678,117 @@
     flex: 1;
     padding: 4px 6px;
     border-radius: 4px;
+    min-width: 60px;
   }
   .attr-module-title:focus { background: rgba(0,0,0,0.2); outline: none; }
 
-  .attr-module-actions { display: flex; gap: 4px; }
+  .attr-module-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
   .attr-icon-btn {
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     background: rgba(0,0,0,0.25);
     color: #fff;
     border: none;
-    font-size: 16px;
+    font-size: 14px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     line-height: 1;
-  }
-  .attr-icon-btn:active { background: rgba(0,0,0,0.4); }
-  .attr-icon-btn.small {
-    width: 24px;
-    height: 24px;
-    font-size: 14px;
-    background: rgba(192,57,43,0.6);
     flex-shrink: 0;
   }
+  .attr-icon-btn:active { background: rgba(0,0,0,0.45); }
+  .attr-icon-btn.tiny {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
+  .attr-icon-btn.danger { background: rgba(192,57,43,0.5); }
+  .attr-icon-btn.small {
+    width: 26px;
+    height: 26px;
+    font-size: 14px;
+    background: rgba(192,57,43,0.5);
+    flex-shrink: 0;
+  }
+
+  .attr-module-body {
+    padding: 8px;
+    background: #262626;
+    border-top: 1px solid #3a3a3a;
+  }
+
+  .attr-group {
+    background: #2b2b2b;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    border-left: 3px solid #4a7cff;
+  }
+  .attr-group:last-child { margin-bottom: 0; }
+
+  .attr-group-header {
+    display: flex;
+    align-items: center;
+    padding: 6px 10px;
+    background: #333;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .attr-group-name {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #4a7cff;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    min-width: 60px;
+  }
+  .attr-group-name:focus { background: #1a1a1a; outline: none; }
+
+  .attr-group-actions { display: flex; gap: 3px; flex-shrink: 0; }
+
+  .attr-group-body { padding: 6px; }
 
   .attr-row {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 10px;
-    border-bottom: 1px solid #3a3a3a;
+    padding: 5px 6px;
+    border-bottom: 1px solid #333;
   }
   .attr-row:last-child { border-bottom: none; }
 
   .attr-row-label {
-    flex: 1;
+    flex: 1 1 120px;
     min-width: 90px;
     background: transparent;
     border: none;
     color: #ddd;
     font-size: 13px;
-    padding: 6px;
+    padding: 6px 8px;
     border-radius: 4px;
   }
   .attr-row-label:focus { background: #1a1a1a; outline: none; }
 
   .attr-cat-btn {
     flex: 0 0 auto;
-    min-width: 110px;
+    min-width: 100px;
     max-width: 140px;
     background: #333;
     border: 1px solid #555;
     color: #aaa;
     padding: 6px 10px;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: 11px;
     cursor: pointer;
     white-space: nowrap;
     overflow: hidden;
@@ -690,18 +804,145 @@
     color: #fff;
   }
 
+  .attr-value-wrap {
+    flex: 1 1 200px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 140px;
+    position: relative;
+  }
+
   .attr-row-value {
     flex: 1;
-    min-width: 80px;
+    min-width: 60px;
     background: #1a1a1a;
     border: 1px solid #444;
     color: #fff;
     padding: 6px 8px;
     border-radius: 4px;
-    font-size: 13px;
+    font-size: 12px;
   }
   .attr-row-value:focus { border-color: #4a7cff; outline: none; }
   .attr-row-value:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .attr-quick-pick {
+    width: 28px;
+    height: 28px;
+    background: #333;
+    border: 1px solid #555;
+    color: #aaa;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .attr-quick-pick:active { background: #3a3a3a; }
+
+  .attr-preview {
+    width: 30px;
+    height: 30px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .attr-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .attr-status {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .attr-status.neutral { background: #333; color: #666; }
+  .attr-status.ok { background: rgba(46,160,67,0.3); color: #2ea043; }
+  .attr-status.partial { background: rgba(255,193,7,0.3); color: #ffc107; }
+  .attr-status.error { background: rgba(192,57,43,0.3); color: #e74c3c; }
+
+  .attr-add-group-btn {
+    width: 100%;
+    background: transparent;
+    border: 1px dashed #555;
+    color: #888;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  .attr-add-group-btn:active { background: #333; }
+
+  /* ===== Автокомплит ===== */
+  .attr-autocomplete {
+    position: fixed;
+    z-index: 600;
+    background: #2a2a2a;
+    border: 1px solid #4a7cff;
+    border-radius: 8px;
+    padding: 4px;
+    max-height: 280px;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .attr-autocomplete-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #fff;
+  }
+  .attr-autocomplete-item:hover,
+  .attr-autocomplete-item:active {
+    background: #4a7cff;
+  }
+  .attr-autocomplete-item img {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    background: #1a1a1a;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .attr-autocomplete-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .attr-autocomplete-name mark {
+    background: rgba(255,193,7,0.4);
+    color: #fff;
+    padding: 0 2px;
+    border-radius: 2px;
+  }
+  .attr-autocomplete-empty,
+  .attr-autocomplete-more {
+    padding: 10px;
+    text-align: center;
+    font-size: 12px;
+    color: #888;
+  }
 
   /* ===== Сетка категорий ===== */
   .category-picker-grid {
@@ -735,10 +976,7 @@
     border-color: #c0392b;
     color: #e74c3c;
   }
-  .category-pick-card .cat-icon {
-    font-size: 24px;
-    line-height: 1;
-  }
+  .category-pick-card .cat-icon { font-size: 24px; line-height: 1; }
   .category-pick-card .cat-name {
     font-size: 12px;
     color: #fff;
@@ -748,10 +986,7 @@
     white-space: nowrap;
     max-width: 100%;
   }
-  .category-pick-card .cat-meta {
-    font-size: 10px;
-    color: #888;
-  }
+  .category-pick-card .cat-meta { font-size: 10px; color: #888; }
 
   /* ===== Галерея ===== */
   #gallery-modal .modal { max-width: 700px; }
@@ -1194,16 +1429,22 @@
 <!-- ===== Модалка: атрибуты ===== -->
 <div class="modal-bg" id="modal-attributes">
   <div class="modal">
-    <h3>📋 Атрибуты персонажа</h3>
-    <div class="hint" style="margin-bottom:12px;">
-      Привяжите атрибут к <strong>категории</strong>, потом вписывайте имя элемента —
-      нужный элемент подставится автоматически.
+    <div class="attr-modal-header">
+      <h3>📋 Атрибуты</h3>
+      <input type="text" id="attr-global-search" placeholder="🔍 Поиск...">
+      <button class="btn" id="attr-random-all" title="Случайно заполнить всё">🎲 Всё</button>
+      <button class="btn" id="attr-add-module" title="Добавить модуль">＋ Модуль</button>
+      <button class="btn primary" data-close>Готово</button>
     </div>
+
+    <div class="attr-progress-wrap">
+      <span id="attr-progress-text">Заполнено 0 из 0</span>
+      <div class="attr-progress-track">
+        <div class="attr-progress-fill" id="attr-progress-bar"></div>
+      </div>
+    </div>
+
     <div id="attributes-list"></div>
-    <div class="modal-actions">
-      <button class="btn" id="attr-add-module" style="flex:1;">＋ Модуль</button>
-      <button class="btn primary" data-close style="flex:1;">Готово</button>
-    </div>
   </div>
 </div>
 
