@@ -1,17 +1,16 @@
-/* bindings-ui.js — UI окна атрибутов и привязок */
+/* bindings-ui.js — UI привязки атрибутов к КАТЕГОРИЯМ */
 (function(global) {
   'use strict';
 
   function createBindingsUI(attributes, ctx) {
     const modal = document.getElementById('modal-attributes');
     const list = document.getElementById('attributes-list');
-    const bindingModal = document.getElementById('modal-binding');
-    const bindingList = document.getElementById('binding-list');
-    const bindingSearch = document.getElementById('binding-search');
-    const bindingSlotsBar = document.getElementById('binding-slots-bar');
+    const categoryPickerModal = document.getElementById('modal-category-picker');
+    const categoryPickerList = document.getElementById('category-picker-list');
+    const categoryPickerSearch = document.getElementById('category-picker-search');
+    const categoryPickerAttrName = document.getElementById('category-picker-attr-name');
 
     let currentAttrId = null;
-    let currentSlotIndex = 0;
     let renderScheduled = false;
 
     function scheduleRender() {
@@ -26,6 +25,7 @@
     function render() {
       list.innerHTML = '';
       const schema = attributes.getSchema();
+      const state = ctx.getState();
 
       for (const mod of schema.modules) {
         const modEl = document.createElement('div');
@@ -77,6 +77,7 @@
           const rowEl = document.createElement('div');
           rowEl.className = 'attr-row';
 
+          // Название
           const label = document.createElement('input');
           label.className = 'attr-row-label';
           label.value = row.label;
@@ -85,29 +86,37 @@
           });
           rowEl.appendChild(label);
 
+          // Кнопка выбора категории
+          const catBtn = document.createElement('button');
+          catBtn.className = 'attr-cat-btn';
+          const boundCat = row.categoryId
+            ? state.categories.find(c => c.id === row.categoryId)
+            : null;
+          if (boundCat) {
+            catBtn.textContent = (boundCat.icon ? boundCat.icon + ' ' : '') + boundCat.name;
+            catBtn.classList.add('has-category');
+          } else {
+            catBtn.textContent = '⚭ Категория';
+          }
+          catBtn.title = 'Привязать к категории';
+          catBtn.addEventListener('click', () => {
+            openCategoryPicker(row.id);
+          });
+          rowEl.appendChild(catBtn);
+
+          // Значение
           const valueInput = document.createElement('input');
           valueInput.className = 'attr-row-value';
           valueInput.value = row.value || '';
-          valueInput.placeholder = '—';
+          valueInput.placeholder = boundCat ? 'имя элемента…' : '—';
           valueInput.dataset.attrId = row.id;
-          // НЕ на change, а на blur + Enter — чтобы не дёргать на каждый символ
+          valueInput.disabled = !row.categoryId;
           valueInput.addEventListener('change', () => {
             attributes.setAttributeValue(row.id, valueInput.value);
-            updateBindingIndicators();
           });
           rowEl.appendChild(valueInput);
 
-          const bindings = attributes.getAllBindingsForAttr(row.id);
-          const bindBadge = document.createElement('button');
-          bindBadge.className = 'attr-bind-badge' +
-            (bindings.length ? ' has-bindings' : '');
-          bindBadge.textContent = bindings.length || '⚭';
-          bindBadge.title = 'Настроить привязки';
-          bindBadge.addEventListener('click', () => {
-            openBindingEditor(row.id, 0);
-          });
-          rowEl.appendChild(bindBadge);
-
+          // Удаление атрибута
           const delBtn2 = document.createElement('button');
           delBtn2.className = 'attr-icon-btn small';
           delBtn2.textContent = '×';
@@ -125,156 +134,91 @@
       }
     }
 
-    function updateBindingIndicators() {
-      const inputs = list.querySelectorAll('.attr-row-value');
-      inputs.forEach(inp => {
-        const attrId = inp.dataset.attrId;
-        const bindings = attributes.getAllBindingsForAttr(attrId);
-        const badge = inp.parentElement.querySelector('.attr-bind-badge');
-        if (badge) {
-          badge.textContent = bindings.length || '⚭';
-          badge.classList.toggle('has-bindings', bindings.length > 0);
-        }
-      });
-    }
-
-    function openBindingEditor(attrId, slotIndex) {
+    // ============ Выбор категории ============
+    function openCategoryPicker(attrId) {
       currentAttrId = attrId;
-      currentSlotIndex = slotIndex || 0;
-
       const attrData = attributes.getAttribute(attrId);
       if (!attrData) return;
 
-      document.getElementById('binding-attr-name').textContent = attrData.row.label;
-      bindingSearch.value = '';
-
-      renderSlotBar();
-      renderBindingList();
-      bindingModal.classList.add('open');
+      categoryPickerAttrName.textContent = attrData.row.label;
+      categoryPickerSearch.value = '';
+      renderCategoryPickerList();
+      categoryPickerModal.classList.add('open');
     }
 
-    function renderSlotBar() {
-      const attrData = attributes.getAttribute(currentAttrId);
-      if (!attrData) return;
-      const slots = attrData.row.slots || 1;
+    function renderCategoryPickerList() {
+      const state = ctx.getState();
+      const query = categoryPickerSearch.value.trim().toLowerCase();
+      const currentCatId = attributes.getBoundCategory(currentAttrId);
 
-      bindingSlotsBar.innerHTML = '';
-      if (slots <= 1) {
-        bindingSlotsBar.style.display = 'none';
+      categoryPickerList.innerHTML = '';
+
+      // Кнопка "Отвязать"
+      if (currentCatId) {
+        const unlinkBtn = document.createElement('button');
+        unlinkBtn.className = 'category-pick-card unlink';
+        unlinkBtn.innerHTML = '<div class="cat-icon">❌</div><div class="cat-name">Отвязать</div>';
+        unlinkBtn.addEventListener('click', () => {
+          attributes.unbindCategory(currentAttrId);
+          closeCategoryPicker();
+          scheduleRender();
+          ctx.toast('Отвязано');
+        });
+        categoryPickerList.appendChild(unlinkBtn);
+      }
+
+      const cats = state.categories.filter(cat => {
+        if (!query) return true;
+        return cat.name.toLowerCase().includes(query);
+      });
+
+      if (cats.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.gridColumn = '1 / -1';
+        empty.style.textAlign = 'center';
+        empty.style.color = '#888';
+        empty.style.padding = '20px';
+        empty.textContent = query ? 'Ничего не найдено' : 'Нет категорий. Создайте категорию в редакторе.';
+        categoryPickerList.appendChild(empty);
         return;
       }
-      bindingSlotsBar.style.display = 'flex';
 
-      for (let i = 0; i < slots; i++) {
-        const btn = document.createElement('button');
-        btn.className = 'slot-btn' + (i === currentSlotIndex ? ' active' : '');
-        const b = attributes.getBinding(currentAttrId, i);
-        btn.textContent = b ? `Слот ${i + 1} •` : `Слот ${i + 1}`;
-        btn.addEventListener('click', () => {
-          currentSlotIndex = i;
-          renderSlotBar();
-          renderBindingList();
+      for (const cat of cats) {
+        const card = document.createElement('div');
+        card.className = 'category-pick-card' + (cat.id === currentCatId ? ' active' : '');
+
+        const icon = document.createElement('div');
+        icon.className = 'cat-icon';
+        icon.textContent = cat.icon || '📁';
+        card.appendChild(icon);
+
+        const name = document.createElement('div');
+        name.className = 'cat-name';
+        name.textContent = cat.name;
+        card.appendChild(name);
+
+        const meta = document.createElement('div');
+        meta.className = 'cat-meta';
+        meta.textContent = `${cat.items.length} эл.`;
+        card.appendChild(meta);
+
+        card.addEventListener('click', () => {
+          attributes.bindCategory(currentAttrId, cat.id);
+          closeCategoryPicker();
+          scheduleRender();
+          ctx.toast('Привязано к «' + cat.name + '»');
         });
-        bindingSlotsBar.appendChild(btn);
+
+        categoryPickerList.appendChild(card);
       }
     }
 
-    function renderBindingList() {
-      const state = ctx.getState();
-      const query = bindingSearch.value.trim().toLowerCase();
-      bindingList.innerHTML = '';
-
-      const current = attributes.getBinding(currentAttrId, currentSlotIndex);
-
-      for (const cat of state.categories) {
-        if (cat.items.length === 0) continue;
-
-        const items = cat.items.filter(it => {
-          if (!query) return true;
-          return it.name.toLowerCase().includes(query);
-        });
-
-        if (items.length === 0) continue;
-
-        const catEl = document.createElement('div');
-        catEl.className = 'binding-category';
-
-        const catTitle = document.createElement('div');
-        catTitle.className = 'binding-category-title';
-        catTitle.textContent = (cat.icon ? cat.icon + ' ' : '') + cat.name;
-        catEl.appendChild(catTitle);
-
-        const grid = document.createElement('div');
-        grid.className = 'binding-grid';
-
-        for (const item of items) {
-          const card = document.createElement('div');
-          card.className = 'binding-card';
-          const isCurrent = current && current.itemId === item.id && current.categoryId === cat.id;
-          if (isCurrent) card.classList.add('active');
-
-          if (item.img) {
-            const img = document.createElement('img');
-            img.src = item.src;
-            img.alt = item.name;
-            img.loading = 'lazy';
-            card.appendChild(img);
-          } else {
-            card.textContent = item.name;
-          }
-
-          const nameEl = document.createElement('div');
-          nameEl.className = 'binding-card-name';
-          nameEl.textContent = item.name;
-          card.appendChild(nameEl);
-
-          card.addEventListener('click', () => {
-            attributes.bindAttribute(currentAttrId, cat.id, item.id, currentSlotIndex);
-            // Тихо подставляем имя без полного обновления
-            const attrData = attributes.getAttribute(currentAttrId);
-            if (attrData) {
-              attrData.row.value = item.name;
-              // Обновляем только это поле в UI
-              const inp = list.querySelector(`.attr-row-value[data-attr-id="${currentAttrId}"]`);
-              if (inp) inp.value = item.name;
-            }
-            closeBindingEditor();
-            ctx.toast('Привязано: ' + item.name);
-          });
-
-          grid.appendChild(card);
-        }
-
-        catEl.appendChild(grid);
-        bindingList.appendChild(catEl);
-      }
-
-      const currentBindings = attributes.getAllBindingsForAttr(currentAttrId);
-      if (currentBindings.length > 0) {
-        const unlinkBtn = document.createElement('button');
-        unlinkBtn.className = 'btn danger';
-        unlinkBtn.style.marginTop = '16px';
-        unlinkBtn.style.width = '100%';
-        unlinkBtn.textContent = '❌ Снять все привязки атрибута';
-        unlinkBtn.addEventListener('click', () => {
-          for (const b of currentBindings) {
-            attributes.unbindAttribute(currentAttrId, b.slotIndex);
-          }
-          attributes.setAttributeValue(currentAttrId, '');
-          const inp = list.querySelector(`.attr-row-value[data-attr-id="${currentAttrId}"]`);
-          if (inp) inp.value = '';
-          closeBindingEditor();
-          ctx.toast('Привязки сняты');
-        });
-        bindingList.appendChild(unlinkBtn);
-      }
-    }
-
-    function closeBindingEditor() {
-      bindingModal.classList.remove('open');
+    function closeCategoryPicker() {
+      categoryPickerModal.classList.remove('open');
       currentAttrId = null;
     }
 
+    // ============ Публичный API ============
     function open() {
       render();
       modal.classList.add('open');
@@ -284,13 +228,17 @@
       modal.classList.remove('open');
     }
 
-    bindingSearch.addEventListener('input', () => {
-      // Дебаунс поиска
-      clearTimeout(bindingSearch._t);
-      bindingSearch._t = setTimeout(renderBindingList, 150);
+    categoryPickerSearch.addEventListener('input', () => {
+      clearTimeout(categoryPickerSearch._t);
+      categoryPickerSearch._t = setTimeout(renderCategoryPickerList, 150);
     });
 
-    return { open, close, render, scheduleRender, updateBindingIndicators, closeBindingEditor };
+    const pickerCancel = document.getElementById('category-picker-cancel');
+    if (pickerCancel) {
+      pickerCancel.addEventListener('click', closeCategoryPicker);
+    }
+
+    return { open, close, render, scheduleRender, closeCategoryPicker };
   }
 
   global.createBindingsUI = createBindingsUI;
