@@ -121,6 +121,7 @@
     scheduleRender();
   }
 
+  // ============ Атрибуты ============
   const attributes = createAttributes({
     getState: () => state,
     invalidate: (catId) => renderer.invalidate(catId),
@@ -135,6 +136,7 @@
     },
   });
 
+  // ============ Автосохранение ============
   const autoSaver = Storage.createAutoSaver(() => {
     const clean = {
       ...state,
@@ -152,6 +154,7 @@
     return clean;
   }, 5000);
 
+  // ============ Рендер ============
   function renderAll() {
     renderer.render({
       categories: state.categories,
@@ -535,6 +538,7 @@
     window.addEventListener('mouseup', onDragEnd);
   }
 
+  // ============ Редактирование категории ============
   let editingCategoryId = null;
 
   function openCategoryEdit(catId) {
@@ -670,7 +674,6 @@
         card.textContent = item.name;
       }
 
-      // Подпись с именем
       const nameLabel = document.createElement('div');
       nameLabel.className = 'item-name-label';
       nameLabel.textContent = item.name;
@@ -685,7 +688,6 @@
       });
       card.appendChild(del);
 
-      // === Тап / долгое нажатие / двойной тап ===
       let longPressTimer = null;
       let longPressFired = false;
       let lastTapTime = 0;
@@ -762,7 +764,7 @@
     commit('delete-item');
   }
 
-  // ============ Модалка добавления элементов ============
+  // ============ Модалка добавления ============
   let pendingFiles = [];
 
   function openModalItem(catId) {
@@ -1029,7 +1031,7 @@
     renamingItemRef = null;
   }
 
-  // ============ Контекстное меню элемента ============
+  // ============ Контекстное меню ============
   let contextMenuData = null;
 
   function openItemContextMenu(x, y, catId, itemId) {
@@ -1449,6 +1451,7 @@
       }
     });
 
+    // ===== Атрибуты =====
     document.getElementById('btn-attributes').addEventListener('click', () => {
       getBindingsUI().open();
     });
@@ -1458,10 +1461,16 @@
       attributes.addModule(name);
       getBindingsUI().scheduleRender();
     });
-    document.getElementById('binding-cancel').addEventListener('click', () => {
-      document.getElementById('modal-binding').classList.remove('open');
-    });
 
+    // ===== Выбор категории для атрибута =====
+    const catPickerCancel = document.getElementById('category-picker-cancel');
+    if (catPickerCancel) {
+      catPickerCancel.addEventListener('click', () => {
+        document.getElementById('modal-category-picker').classList.remove('open');
+      });
+    }
+
+    // ===== Галерея =====
     document.getElementById('btn-gallery').addEventListener('click', () => gallery.open());
     document.getElementById('gallery-new').addEventListener('click', async () => {
       const name = prompt('Название персонажа:', 'Персонаж');
@@ -1477,8 +1486,10 @@
       document.getElementById('modal-import').classList.add('open');
     });
 
+    // ===== Слои =====
     document.getElementById('btn-layers').addEventListener('click', openLayers);
 
+    // ===== Новая категория =====
     document.getElementById('btn-add-cat').addEventListener('click', () => {
       document.getElementById('cat-name').value = '';
       document.getElementById('modal-cat').classList.add('open');
@@ -1491,6 +1502,7 @@
       document.getElementById('modal-cat').classList.remove('open');
     });
 
+    // ===== Добавить элементы =====
     document.getElementById('item-save').addEventListener('click', async () => {
       const catId = state.activeCategoryId;
       if (!catId) {
@@ -1512,7 +1524,7 @@
       pendingFiles = [];
     });
 
-    // Переименование элемента
+    // ===== Переименование элемента =====
     const itemRenameSave = document.getElementById('item-rename-save');
     if (itemRenameSave) itemRenameSave.addEventListener('click', saveItemRename);
     const itemRenameInput = document.getElementById('item-rename-name');
@@ -1525,9 +1537,11 @@
       });
     }
 
+    // ===== Экспорт =====
     document.getElementById('btn-export').addEventListener('click', openExportModal);
     setupExportModal();
 
+    // ===== Импорт =====
     document.getElementById('btn-import').addEventListener('click', () => {
       document.getElementById('import-file').value = '';
       document.getElementById('modal-import').classList.add('open');
@@ -1543,6 +1557,7 @@
       }
     });
 
+    // ===== Новый проект =====
     document.getElementById('btn-new').addEventListener('click', async () => {
       if (!await confirmDialog('Создать нового персонажа? Текущий сохранится в галерее.')) return;
       const name = prompt('Название персонажа:', 'Персонаж');
@@ -1564,10 +1579,12 @@
       toast('Новый персонаж создан');
     });
 
+    // ===== Закрыть панель =====
     document.getElementById('btn-close-items').addEventListener('click', () => {
       itemsPanel.classList.remove('open');
     });
 
+    // ===== Зум =====
     document.getElementById('zoom-in').addEventListener('click', () => setScale(view.scale * 1.25));
     document.getElementById('zoom-out').addEventListener('click', () => setScale(view.scale * 0.8));
     document.getElementById('zoom-100').addEventListener('click', () => {
@@ -1577,6 +1594,7 @@
     });
     document.getElementById('zoom-fit').addEventListener('click', fitToScreen);
 
+    // ===== Инструменты холста =====
     document.getElementById('tool-grid').addEventListener('click', (e) => {
       view.gridOn = !view.gridOn;
       e.currentTarget.classList.toggle('active', view.gridOn);
@@ -1593,6 +1611,7 @@
       applyTransform();
     });
 
+    // ===== Редактирование категории =====
     const saveBtn = document.getElementById('cat-edit-save');
     if (saveBtn) saveBtn.addEventListener('click', saveCategoryEdit);
     const leftBtn = document.getElementById('cat-edit-left');
