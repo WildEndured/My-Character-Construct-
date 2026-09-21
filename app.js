@@ -688,10 +688,9 @@
       });
       card.appendChild(del);
 
+      // === Тап / долгое нажатие (БЕЗ двойного тапа) ===
       let longPressTimer = null;
       let longPressFired = false;
-      let lastTapTime = 0;
-      let tapTimer = null;
 
       const onPressStart = (e) => {
         if (e.target.closest('.del-x')) return;
@@ -708,25 +707,15 @@
         if (longPressFired) return;
         if (e.target.closest('.del-x')) return;
 
-        const now = Date.now();
-        if (now - lastTapTime < 300) {
-          clearTimeout(tapTimer);
-          lastTapTime = 0;
-          openItemRename(cat.id, item.id);
-          return;
+        // Обычный тап — переключить активный элемент
+        if (state.activeItems[cat.id] === item.id) {
+          delete state.activeItems[cat.id];
+        } else {
+          state.activeItems[cat.id] = item.id;
         }
-        lastTapTime = now;
-
-        tapTimer = setTimeout(() => {
-          if (state.activeItems[cat.id] === item.id) {
-            delete state.activeItems[cat.id];
-          } else {
-            state.activeItems[cat.id] = item.id;
-          }
-          renderer.invalidate(cat.id);
-          renderItems();
-          commit('toggle-item');
-        }, 250);
+        renderer.invalidate(cat.id);
+        renderItems();
+        commit('toggle-item');
       };
 
       const onPressCancel = () => {
@@ -1416,7 +1405,11 @@
   function setupModals() {
     document.querySelectorAll('.modal-bg').forEach(bg => {
       bg.addEventListener('click', (e) => {
-        if (e.target === bg) bg.classList.remove('open');
+        if (e.target === bg) {
+          // Если открыт автокомплит — не закрываем
+          if (bindingsUI) bindingsUI.closeAutocomplete();
+          bg.classList.remove('open');
+        }
       });
     });
     document.querySelectorAll('[data-close]').forEach(btn => {
@@ -1455,12 +1448,16 @@
     document.getElementById('btn-attributes').addEventListener('click', () => {
       getBindingsUI().open();
     });
-    document.getElementById('attr-add-module').addEventListener('click', () => {
-      const name = prompt('Название модуля:', 'Новый модуль');
-      if (name === null) return;
-      attributes.addModule(name);
-      getBindingsUI().scheduleRender();
-    });
+
+    const attrAddModule = document.getElementById('attr-add-module');
+    if (attrAddModule) {
+      attrAddModule.addEventListener('click', () => {
+        const name = prompt('Название модуля:', 'Новый модуль');
+        if (name === null) return;
+        attributes.addModule(name);
+        getBindingsUI().scheduleRender();
+      });
+    }
 
     // ===== Выбор категории для атрибута =====
     const catPickerCancel = document.getElementById('category-picker-cancel');
