@@ -89,7 +89,6 @@
     };
   }
 
-  // ============ Рендер с дебаунсом ============
   let renderScheduled = false;
   function scheduleRender() {
     if (renderScheduled) return;
@@ -100,7 +99,7 @@
     });
   }
 
-  // ============ История с дебаунсом (не блокирует UI) ============
+  // Дебаунс истории — не блокирует UI
   let historyDebounceTimer = null;
   let pendingHistoryLabel = null;
 
@@ -115,14 +114,6 @@
     }, 400);
   }
 
-  // Лёгкий commit для частых операций (toggle items)
-  function commitLight(label) {
-    scheduleHistory(label);
-    autoSaver.schedule();
-    scheduleRender();
-  }
-
-  // Тяжёлый commit для редких операций (удаление, создание)
   function commit(label) {
     clearTimeout(historyDebounceTimer);
     pendingHistoryLabel = null;
@@ -156,7 +147,6 @@
       autoSaver.schedule();
     },
     onDataChanged: (label) => {
-      // Лёгкий commit — не блокируем
       scheduleHistory(label);
       autoSaver.schedule();
       scheduleRender();
@@ -716,65 +706,10 @@
       });
       card.appendChild(del);
 
-      // === Тап — выбор / переключение. Долгое нажатие — контекстное меню ===
-      let longPressTimer = null;
-      let longPressFired = false;
-      let pointerStartX = 0;
-      let pointerStartY = 0;
-      let pointerMoved = false;
-
-      const onPressStart = (e) => {
+      // Единственный обработчик — тап открывает меню действий
+      card.addEventListener('click', (e) => {
         if (e.target.closest('.del-x')) return;
-        longPressFired = false;
-        pointerMoved = false;
-        const touch = e.touches ? e.touches[0] : e;
-        pointerStartX = touch.clientX;
-        pointerStartY = touch.clientY;
-
-        longPressTimer = setTimeout(() => {
-          if (pointerMoved) return;
-          longPressFired = true;
-          if (navigator.vibrate) navigator.vibrate(20);
-          openItemContextMenu(pointerStartX, pointerStartY, cat.id, item.id);
-        }, 600);
-      };
-
-      const onPressMove = (e) => {
-        if (longPressFired) return;
-        const touch = e.touches ? e.touches[0] : e;
-        const dx = Math.abs(touch.clientX - pointerStartX);
-        const dy = Math.abs(touch.clientY - pointerStartY);
-        if (dx > 8 || dy > 8) {
-          pointerMoved = true;
-          clearTimeout(longPressTimer);
-        }
-      };
-
-      const onPressEnd = (e) => {
-        clearTimeout(longPressTimer);
-        if (longPressFired) return;
-        if (pointerMoved) return;
-        if (e.target.closest && e.target.closest('.del-x')) return;
-
-        // Переключаем активный элемент
-        toggleItem(cat.id, item.id);
-      };
-
-      const onPressCancel = () => {
-        clearTimeout(longPressTimer);
-      };
-
-      card.addEventListener('touchstart', onPressStart, { passive: true });
-      card.addEventListener('touchmove', onPressMove, { passive: true });
-      card.addEventListener('touchend', onPressEnd);
-      card.addEventListener('touchcancel', onPressCancel);
-      card.addEventListener('mousedown', onPressStart);
-      card.addEventListener('mousemove', onPressMove);
-      card.addEventListener('mouseup', onPressEnd);
-
-      card.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        openItemContextMenu(e.clientX, e.clientY, cat.id, item.id);
+        openItemActionMenu(cat.id, item.id);
       });
 
       itemsList.appendChild(card);
@@ -787,7 +722,90 @@
     itemsList.appendChild(addBtn);
   }
 
-  // Мгновенное переключение без тяжёлого commit
+  // ============ Меню действий с элементом ============
+  let actionMenuData = null;
+
+  function openItemActionMenu(catId, itemId) {
+    const cat = state.categories.find(c => c.id === catId);
+    if (!cat) return;
+    const item = cat.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    actionMenuData = { catId, itemId };
+    const modal = document.getElementById('modal-item-actions');
+    const preview = document.getElementById('item-action-preview');
+    const nameEl = document.getElementById('item-action-name');
+    const selectBtn = document.getElementById('item-action-select');
+    const isActive = state.activeItems[catId] === itemId;
+
+    preview.innerHTML = '';
+    if (item.src) {
+      const img = document.createElement('img');
+      img.src = item.src;
+      img.alt = item.name;
+      preview.appendChild(img);
+    }
+
+    nameEl.textContent = item.name || 'Без названия';
+
+    if (isActive) {
+      selectBtn.textContent = '✕ Снять выбор';
+      selectBtn.className = 'btn item-action-big';
+    } else {
+      selectBtn.textContent = '✓ Выбрать';
+      selectBtn.className = 'btn primary item-action-big';
+    }
+
+    modal.classList.add('open');
+    if (navigator.vibrate) navigator.vibrate(10);
+  }
+
+  function closeItemActionMenu() {
+    document.getElementById('modal-item-actions').classList.remove('open');
+    actionMenuData = null;
+  }
+
+  function setupItemActionMenu() {
+    const modal = document.getElementById('modal-item-actions');
+    if (!modal) return;
+
+    document.getElementById('item-action-select').addEventListener('click', () => {
+      if (!actionMenuData) return;
+      const { catId, itemId } = actionMenuData;
+      toggleItem(catId, itemId);
+      closeItemActionMenu();
+    });
+
+    document.getElementById('item-action-rename').addEventListener('click', () => {
+      if (!actionMenuData) return;
+      const { catId, itemId } = actionMenuData;
+      closeItemActionMenu();
+      setTimeout(() => openItemRename(catId, itemId), 200);
+    });
+
+    document.getElementById('item-action-duplicate').addEventListener('click', () => {
+      if (!actionMenuData) return;
+      const { catId, itemId } = actionMenuData;
+      closeItemActionMenu();
+      duplicateItem(catId, itemId);
+    });
+
+    document.getElementById('item-action-delete').addEventListener('click', () => {
+      if (!actionMenuData) return;
+      const { catId, itemId } = actionMenuData;
+      closeItemActionMenu();
+      deleteItem(catId, itemId);
+    });
+
+    document.getElementById('item-action-cancel').addEventListener('click', closeItemActionMenu);
+
+    // Закрытие по фону
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeItemActionMenu();
+    });
+  }
+
+  // Мгновенное переключение
   function toggleItem(catId, itemId) {
     const cat = state.categories.find(c => c.id === catId);
     if (!cat) return;
@@ -798,14 +816,15 @@
       state.activeItems[catId] = itemId;
     }
 
-    // Мгновенно обновляем DOM (без полного ре-рендера списка)
     const cards = itemsList.querySelectorAll('.item-card[data-item-id]');
     cards.forEach(c => {
       c.classList.toggle('active', state.activeItems[catId] === c.dataset.itemId);
     });
 
     renderer.invalidate(catId);
-    commitLight('toggle-item');
+    scheduleHistory('toggle-item');
+    autoSaver.schedule();
+    scheduleRender();
   }
 
   function deleteItem(catId, itemId) {
@@ -1057,7 +1076,7 @@
       const inp = document.getElementById('item-rename-name');
       inp.focus();
       inp.select();
-    }, 50);
+    }, 100);
   }
 
   function saveItemRename() {
@@ -1085,60 +1104,6 @@
     renamingItemRef = null;
   }
 
-  // ============ Контекстное меню ============
-  let contextMenuData = null;
-
-  function openItemContextMenu(x, y, catId, itemId) {
-    const menu = document.getElementById('item-context-menu');
-    contextMenuData = { catId, itemId };
-    menu.classList.add('open');
-    menu.style.left = '0px';
-    menu.style.top = '0px';
-    const rect = menu.getBoundingClientRect();
-    const maxX = window.innerWidth - rect.width - 8;
-    const maxY = window.innerHeight - rect.height - 8;
-    menu.style.left = Math.min(x, maxX) + 'px';
-    menu.style.top = Math.min(y, maxY) + 'px';
-    if (navigator.vibrate) navigator.vibrate(10);
-  }
-
-  function closeItemContextMenu() {
-    document.getElementById('item-context-menu').classList.remove('open');
-    contextMenuData = null;
-  }
-
-  function setupItemContextMenu() {
-    const menu = document.getElementById('item-context-menu');
-    if (!menu) return;
-
-    menu.querySelectorAll('.ctx-item').forEach(el => {
-      el.addEventListener('click', () => {
-        const action = el.dataset.action;
-        if (!contextMenuData) return;
-        const { catId, itemId } = contextMenuData;
-        closeItemContextMenu();
-
-        if (action === 'rename') {
-          openItemRename(catId, itemId);
-        } else if (action === 'duplicate') {
-          duplicateItem(catId, itemId);
-        } else if (action === 'delete') {
-          deleteItem(catId, itemId);
-        } else if (action === 'move') {
-          moveItemToCategory(catId, itemId);
-        }
-      });
-    });
-
-    document.addEventListener('pointerdown', (e) => {
-      if (menu.classList.contains('open') && !menu.contains(e.target)) {
-        closeItemContextMenu();
-      }
-    });
-    window.addEventListener('scroll', closeItemContextMenu, { passive: true, capture: true });
-    window.addEventListener('resize', closeItemContextMenu);
-  }
-
   function duplicateItem(catId, itemId) {
     const cat = state.categories.find(c => c.id === catId);
     if (!cat) return;
@@ -1157,41 +1122,6 @@
     renderItems();
     commit('duplicate-item');
     toast('Дублировано');
-  }
-
-  function moveItemToCategory(catId, itemId) {
-    const cat = state.categories.find(c => c.id === catId);
-    if (!cat) return;
-    const item = cat.items.find(i => i.id === itemId);
-    if (!item) return;
-
-    const otherCats = state.categories.filter(c => c.id !== catId);
-    if (otherCats.length === 0) {
-      toast('Нет других категорий', 'error');
-      return;
-    }
-
-    const names = otherCats.map((c, i) => `${i + 1}. ${c.name}`).join('\n');
-    const choice = prompt(`Переместить "${item.name}" в какую категорию?\n\n${names}\n\nВведите номер:`, '1');
-    if (choice === null) return;
-    const idx = parseInt(choice, 10) - 1;
-    if (isNaN(idx) || idx < 0 || idx >= otherCats.length) {
-      toast('Неверный выбор', 'error');
-      return;
-    }
-
-    const targetCat = otherCats[idx];
-    cat.items = cat.items.filter(i => i.id !== itemId);
-    if (state.activeItems[cat.id] === itemId) {
-      delete state.activeItems[cat.id];
-    }
-    targetCat.items.push(item);
-
-    renderer.invalidate(cat.id);
-    renderer.invalidate(targetCat.id);
-    renderItems();
-    commit('move-item');
-    toast(`Перемещено в «${targetCat.name}»`);
   }
 
   // ============ Слои ============
@@ -1466,7 +1396,6 @@
     document.querySelectorAll('.modal-bg').forEach(bg => {
       bg.addEventListener('click', (e) => {
         if (e.target === bg) {
-          // Закрываем автокомплит, если открыт
           if (bindingsUI) bindingsUI.closeAutocomplete();
           bg.classList.remove('open');
         }
@@ -1484,7 +1413,7 @@
   function bindUI() {
     setupItemFileInput();
     setupItemNamesActions();
-    setupItemContextMenu();
+    setupItemActionMenu();
 
     document.getElementById('btn-undo').addEventListener('click', () => {
       const s = history.undo();
