@@ -1,4 +1,4 @@
-/* app.js — сборка редактора (с фиксами производительности) */
+/* app.js — сборка редактора */
 (function() {
   'use strict';
 
@@ -35,7 +35,6 @@
 
   const renderer = createRenderer(canvas);
 
-  // ============ Тост ============
   const toastsEl = document.getElementById('toasts');
   function toast(msg, type = '') {
     const el = document.createElement('div');
@@ -53,7 +52,6 @@
     return Promise.resolve(window.confirm(msg));
   }
 
-  // ============ Прогресс ============
   const progressOverlay = document.getElementById('progress-overlay');
   const progressLabel = document.getElementById('progress-label');
   const progressFill = document.getElementById('progress-fill');
@@ -76,7 +74,6 @@
     return new Promise(r => requestAnimationFrame(() => r()));
   }
 
-  // ============ История ============
   const history = createHistory(({ canUndo, canRedo }) => {
     document.getElementById('btn-undo').disabled = !canUndo;
     document.getElementById('btn-redo').disabled = !canRedo;
@@ -92,7 +89,6 @@
     };
   }
 
-  // Debounce рендера — единый кадр
   let renderScheduled = false;
   function scheduleRender() {
     if (renderScheduled) return;
@@ -125,27 +121,20 @@
     scheduleRender();
   }
 
-  // ============ Атрибуты ============
-  let attributesReady = false;
-
   const attributes = createAttributes({
     getState: () => state,
     invalidate: (catId) => renderer.invalidate(catId),
-    // Лёгкий колбэк — только рендер без истории
-    onBindingsChanged: (changedCats) => {
+    onBindingsChanged: () => {
       scheduleRender();
       autoSaver.schedule();
     },
-    // Тяжёлый — с историей (для явных действий пользователя)
     onDataChanged: (label) => {
       history.push(snapshot(), label);
       autoSaver.schedule();
       scheduleRender();
     },
   });
-  attributesReady = true;
 
-  // ============ Автосохранение ============
   const autoSaver = Storage.createAutoSaver(() => {
     const clean = {
       ...state,
@@ -163,7 +152,6 @@
     return clean;
   }, 5000);
 
-  // ============ Рендер ============
   function renderAll() {
     renderer.render({
       categories: state.categories,
@@ -375,6 +363,7 @@
       const editBtn = document.createElement('div');
       editBtn.className = 'edit-btn';
       editBtn.textContent = '✎';
+      editBtn.title = 'Редактировать';
       editBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         if (navigator.vibrate) navigator.vibrate(10);
@@ -546,7 +535,6 @@
     window.addEventListener('mouseup', onDragEnd);
   }
 
-  // ============ Редактирование категории ============
   let editingCategoryId = null;
 
   function openCategoryEdit(catId) {
@@ -682,6 +670,12 @@
         card.textContent = item.name;
       }
 
+      // Подпись с именем
+      const nameLabel = document.createElement('div');
+      nameLabel.className = 'item-name-label';
+      nameLabel.textContent = item.name;
+      card.appendChild(nameLabel);
+
       const del = document.createElement('div');
       del.className = 'del-x';
       del.textContent = '×';
@@ -691,15 +685,61 @@
       });
       card.appendChild(del);
 
-      card.addEventListener('click', () => {
-        if (state.activeItems[cat.id] === item.id) {
-          delete state.activeItems[cat.id];
-        } else {
-          state.activeItems[cat.id] = item.id;
+      // === Тап / долгое нажатие / двойной тап ===
+      let longPressTimer = null;
+      let longPressFired = false;
+      let lastTapTime = 0;
+      let tapTimer = null;
+
+      const onPressStart = (e) => {
+        if (e.target.closest('.del-x')) return;
+        longPressFired = false;
+        longPressTimer = setTimeout(() => {
+          longPressFired = true;
+          const touch = e.touches ? e.touches[0] : e;
+          openItemContextMenu(touch.clientX, touch.clientY, cat.id, item.id);
+        }, 600);
+      };
+
+      const onPressEnd = (e) => {
+        clearTimeout(longPressTimer);
+        if (longPressFired) return;
+        if (e.target.closest('.del-x')) return;
+
+        const now = Date.now();
+        if (now - lastTapTime < 300) {
+          clearTimeout(tapTimer);
+          lastTapTime = 0;
+          openItemRename(cat.id, item.id);
+          return;
         }
-        renderer.invalidate(cat.id);
-        renderItems();
-        commit('toggle-item');
+        lastTapTime = now;
+
+        tapTimer = setTimeout(() => {
+          if (state.activeItems[cat.id] === item.id) {
+            delete state.activeItems[cat.id];
+          } else {
+            state.activeItems[cat.id] = item.id;
+          }
+          renderer.invalidate(cat.id);
+          renderItems();
+          commit('toggle-item');
+        }, 250);
+      };
+
+      const onPressCancel = () => {
+        clearTimeout(longPressTimer);
+      };
+
+      card.addEventListener('touchstart', onPressStart, { passive: true });
+      card.addEventListener('touchend', onPressEnd);
+      card.addEventListener('touchcancel', onPressCancel);
+      card.addEventListener('mousedown', onPressStart);
+      card.addEventListener('mouseup', onPressEnd);
+
+      card.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        openItemContextMenu(e.clientX, e.clientY, cat.id, item.id);
       });
 
       itemsList.appendChild(card);
@@ -712,28 +752,220 @@
     itemsList.appendChild(addBtn);
   }
 
-  async function addItemsFromFiles(catId, files, baseName) {
+  function deleteItem(catId, itemId) {
     const cat = state.categories.find(c => c.id === catId);
     if (!cat) return;
-    if (!files || files.length === 0) return;
+    cat.items = cat.items.filter(i => i.id !== itemId);
+    if (state.activeItems[catId] === itemId) delete state.activeItems[catId];
+    renderer.invalidate(catId);
+    renderItems();
+    commit('delete-item');
+  }
 
-    showProgress('Загрузка...', 0);
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      updateProgress((i / files.length) * 100, `Загрузка ${i + 1}/${files.length}`);
-      await nextFrame();
-      const src = await readFileAsDataURL(file);
-      const img = await Exporter.loadImage(src);
-      const item = {
-        id: nextId(),
-        name: file.name.replace(/\.[^.]+$/, '') || baseName || 'Элемент',
-        src,
-        img,
-        transform: null,
+  // ============ Модалка добавления элементов ============
+  let pendingFiles = [];
+
+  function openModalItem(catId) {
+    pendingFiles = [];
+    document.getElementById('item-file').value = '';
+    document.getElementById('item-files-list').innerHTML = '';
+    document.getElementById('item-files-list-wrap').style.display = 'none';
+    document.getElementById('item-files-count').textContent = '';
+    document.getElementById('item-save').disabled = true;
+    document.getElementById('modal-item').classList.add('open');
+  }
+
+  function renderPendingFilesList() {
+    const list = document.getElementById('item-files-list');
+    const wrap = document.getElementById('item-files-list-wrap');
+    const count = document.getElementById('item-files-count');
+    const saveBtn = document.getElementById('item-save');
+
+    list.innerHTML = '';
+
+    if (pendingFiles.length === 0) {
+      wrap.style.display = 'none';
+      saveBtn.disabled = true;
+      return;
+    }
+
+    wrap.style.display = 'block';
+    count.textContent = `(${pendingFiles.length})`;
+    saveBtn.disabled = false;
+
+    pendingFiles.forEach((item, idx) => {
+      const row = document.createElement('div');
+      row.className = 'item-file-row';
+
+      const thumb = document.createElement('div');
+      thumb.className = 'thumb';
+      if (item.thumbSrc) {
+        const img = document.createElement('img');
+        img.src = item.thumbSrc;
+        img.alt = item.name;
+        thumb.appendChild(img);
+      }
+      row.appendChild(thumb);
+
+      const info = document.createElement('div');
+      info.className = 'info';
+
+      const origName = document.createElement('div');
+      origName.className = 'original-name';
+      origName.textContent = item.file.name;
+      info.appendChild(origName);
+
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.className = 'name-input';
+      nameInput.value = item.name;
+      nameInput.placeholder = 'Название элемента';
+      nameInput.addEventListener('input', () => {
+        pendingFiles[idx].name = nameInput.value;
+      });
+      nameInput.addEventListener('focus', () => nameInput.select());
+      info.appendChild(nameInput);
+
+      row.appendChild(info);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'remove-file';
+      removeBtn.textContent = '×';
+      removeBtn.title = 'Убрать из списка';
+      removeBtn.addEventListener('click', () => {
+        pendingFiles.splice(idx, 1);
+        renderPendingFilesList();
+      });
+      row.appendChild(removeBtn);
+
+      list.appendChild(row);
+    });
+  }
+
+  function setupItemFileInput() {
+    const input = document.getElementById('item-file');
+    if (!input) return;
+
+    input.addEventListener('change', async () => {
+      const files = Array.from(input.files || []);
+      if (files.length === 0) return;
+
+      showProgress('Чтение файлов…', 0);
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        updateProgress((i / files.length) * 100, `Чтение ${i + 1}/${files.length}`);
+
+        const originalName = file.name.replace(/\.[^.]+$/, '');
+        let thumbSrc = null;
+        let src = null;
+
+        try {
+          src = await readFileAsDataURL(file);
+          thumbSrc = await makeThumbnailFromDataURL(src, 128);
+        } catch (e) {
+          console.warn('Не удалось прочитать файл', file.name, e);
+          continue;
+        }
+
+        pendingFiles.push({
+          file,
+          src,
+          thumbSrc,
+          name: originalName,
+        });
+      }
+
+      hideProgress();
+      input.value = '';
+      renderPendingFilesList();
+    });
+  }
+
+  function makeThumbnailFromDataURL(dataUrl, size) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const c = document.createElement('canvas');
+          const ratio = img.width / img.height;
+          let w = size, h = size;
+          if (ratio > 1) h = Math.round(size / ratio);
+          else w = Math.round(size * ratio);
+          c.width = w;
+          c.height = h;
+          const cx = c.getContext('2d');
+          cx.drawImage(img, 0, 0, w, h);
+          resolve(c.toDataURL('image/jpeg', 0.7));
+        } catch (e) {
+          resolve(null);
+        }
       };
-      cat.items.push(item);
-      if (i === 0 && !state.activeItems[cat.id]) {
-        state.activeItems[cat.id] = item.id;
+      img.onerror = () => resolve(null);
+      img.src = dataUrl;
+    });
+  }
+
+  function setupItemNamesActions() {
+    const clearBtn = document.getElementById('item-names-clear');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        pendingFiles.forEach(f => { f.name = ''; });
+        renderPendingFilesList();
+      });
+    }
+
+    const stripBtn = document.getElementById('item-names-strip-ext');
+    if (stripBtn) {
+      stripBtn.addEventListener('click', () => {
+        pendingFiles.forEach(f => {
+          f.name = f.file.name.replace(/\.[^.]+$/, '');
+        });
+        renderPendingFilesList();
+      });
+    }
+
+    const numberBtn = document.getElementById('item-names-number');
+    if (numberBtn) {
+      numberBtn.addEventListener('click', () => {
+        const prefix = pendingFiles.length > 0 && pendingFiles[0].name
+          ? pendingFiles[0].name.replace(/\s*\d+\s*$/, '')
+          : 'Элемент';
+        pendingFiles.forEach((f, i) => {
+          f.name = `${prefix} ${i + 1}`;
+        });
+        renderPendingFilesList();
+      });
+    }
+  }
+
+  async function addItemsFromPrepared(catId, items) {
+    const cat = state.categories.find(c => c.id === catId);
+    if (!cat) return;
+    if (!items || items.length === 0) return;
+
+    showProgress('Добавление...', 0);
+    for (let i = 0; i < items.length; i++) {
+      const { name, src } = items[i];
+      updateProgress((i / items.length) * 100, `${i + 1} / ${items.length}`);
+      await nextFrame();
+
+      try {
+        const img = await Exporter.loadImage(src);
+        const item = {
+          id: nextId(),
+          name: name || 'Элемент',
+          src,
+          img,
+          transform: null,
+        };
+        cat.items.push(item);
+        if (i === 0 && !state.activeItems[cat.id]) {
+          state.activeItems[cat.id] = item.id;
+        }
+      } catch (e) {
+        console.warn('Не удалось загрузить', name, e);
       }
     }
     updateProgress(100);
@@ -741,7 +973,7 @@
     renderer.invalidate(catId);
     renderItems();
     commit('add-items');
-    toast(`Добавлено: ${files.length}`);
+    toast(`Добавлено: ${items.length}`);
   }
 
   function readFileAsDataURL(file) {
@@ -753,14 +985,162 @@
     });
   }
 
-  function deleteItem(catId, itemId) {
+  // ============ Переименование элемента ============
+  let renamingItemRef = null;
+
+  function openItemRename(catId, itemId) {
     const cat = state.categories.find(c => c.id === catId);
     if (!cat) return;
-    cat.items = cat.items.filter(i => i.id !== itemId);
-    if (state.activeItems[catId] === itemId) delete state.activeItems[catId];
-    renderer.invalidate(catId);
+    const item = cat.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    renamingItemRef = { catId, itemId };
+    document.getElementById('item-rename-name').value = item.name || '';
+    document.getElementById('modal-item-rename').classList.add('open');
+    setTimeout(() => {
+      const inp = document.getElementById('item-rename-name');
+      inp.focus();
+      inp.select();
+    }, 50);
+  }
+
+  function saveItemRename() {
+    if (!renamingItemRef) return;
+    const { catId, itemId } = renamingItemRef;
+    const cat = state.categories.find(c => c.id === catId);
+    if (!cat) return;
+    const item = cat.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    const newName = document.getElementById('item-rename-name').value.trim();
+    if (!newName) {
+      toast('Введите название', 'error');
+      return;
+    }
+
+    if (item.name !== newName) {
+      item.name = newName;
+      renderItems();
+      commit('rename-item');
+      toast('Переименовано', 'success');
+    }
+
+    document.getElementById('modal-item-rename').classList.remove('open');
+    renamingItemRef = null;
+  }
+
+  // ============ Контекстное меню элемента ============
+  let contextMenuData = null;
+
+  function openItemContextMenu(x, y, catId, itemId) {
+    const menu = document.getElementById('item-context-menu');
+    contextMenuData = { catId, itemId };
+    menu.classList.add('open');
+    menu.style.left = '0px';
+    menu.style.top = '0px';
+    const rect = menu.getBoundingClientRect();
+    const maxX = window.innerWidth - rect.width - 8;
+    const maxY = window.innerHeight - rect.height - 8;
+    menu.style.left = Math.min(x, maxX) + 'px';
+    menu.style.top = Math.min(y, maxY) + 'px';
+    if (navigator.vibrate) navigator.vibrate(10);
+  }
+
+  function closeItemContextMenu() {
+    document.getElementById('item-context-menu').classList.remove('open');
+    contextMenuData = null;
+  }
+
+  function setupItemContextMenu() {
+    const menu = document.getElementById('item-context-menu');
+    if (!menu) return;
+
+    menu.querySelectorAll('.ctx-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const action = el.dataset.action;
+        if (!contextMenuData) return;
+        const { catId, itemId } = contextMenuData;
+        closeItemContextMenu();
+
+        if (action === 'rename') {
+          openItemRename(catId, itemId);
+        } else if (action === 'duplicate') {
+          duplicateItem(catId, itemId);
+        } else if (action === 'delete') {
+          deleteItem(catId, itemId);
+        } else if (action === 'move') {
+          moveItemToCategory(catId, itemId);
+        }
+      });
+    });
+
+    document.addEventListener('touchstart', (e) => {
+      if (menu.classList.contains('open') && !menu.contains(e.target)) {
+        closeItemContextMenu();
+      }
+    }, { passive: true });
+    document.addEventListener('mousedown', (e) => {
+      if (menu.classList.contains('open') && !menu.contains(e.target)) {
+        closeItemContextMenu();
+      }
+    });
+    window.addEventListener('scroll', closeItemContextMenu, { passive: true });
+    window.addEventListener('resize', closeItemContextMenu);
+  }
+
+  function duplicateItem(catId, itemId) {
+    const cat = state.categories.find(c => c.id === catId);
+    if (!cat) return;
+    const item = cat.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    const copy = {
+      id: nextId(),
+      name: item.name + ' (копия)',
+      src: item.src,
+      img: item.img,
+      transform: item.transform ? { ...item.transform } : null,
+    };
+    const idx = cat.items.indexOf(item);
+    cat.items.splice(idx + 1, 0, copy);
     renderItems();
-    commit('delete-item');
+    commit('duplicate-item');
+    toast('Дублировано');
+  }
+
+  function moveItemToCategory(catId, itemId) {
+    const cat = state.categories.find(c => c.id === catId);
+    if (!cat) return;
+    const item = cat.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    const otherCats = state.categories.filter(c => c.id !== catId);
+    if (otherCats.length === 0) {
+      toast('Нет других категорий', 'error');
+      return;
+    }
+
+    const names = otherCats.map((c, i) => `${i + 1}. ${c.name}`).join('\n');
+    const choice = prompt(`Переместить "${item.name}" в какую категорию?\n\n${names}\n\nВведите номер:`, '1');
+    if (choice === null) return;
+    const idx = parseInt(choice, 10) - 1;
+    if (isNaN(idx) || idx < 0 || idx >= otherCats.length) {
+      toast('Неверный выбор', 'error');
+      return;
+    }
+
+    const targetCat = otherCats[idx];
+    cat.items = cat.items.filter(i => i.id !== itemId);
+    if (state.activeItems[cat.id] === itemId) {
+      delete state.activeItems[cat.id];
+    }
+    targetCat.items.push(item);
+
+    renderer.invalidate(cat.id);
+    renderer.invalidate(targetCat.id);
+    renderItems();
+    commit('move-item');
+    toast(`Перемещено в «${targetCat.name}»`);
   }
 
   // ============ Слои ============
@@ -997,7 +1377,6 @@
   const gallery = createGallery({
     getCurrentState: () => state,
     loadState: (newState) => {
-      // Выгружаем старые canvas ПЕРЕД загрузкой
       renderer.invalidateAll();
       state = { ...newState };
       if (state.attributes) {
@@ -1009,15 +1388,9 @@
       if (state.activeCategoryId) openCategory(state.activeCategoryId);
       else itemsPanel.classList.remove('open');
       history.reset(snapshot());
-      // Один рендер
       scheduleRender();
-      // Применяем привязки с задержкой, чтобы не тормозить
       setTimeout(() => {
-        try {
-          attributes.applyAllBindings();
-        } catch (e) {
-          console.warn('applyAllBindings error:', e);
-        }
+        try { attributes.applyAllBindings(); } catch (e) { console.warn(e); }
       }, 500);
       autoSaver.schedule();
     },
@@ -1027,7 +1400,6 @@
 
   // ============ Bindings UI ============
   let bindingsUI = null;
-
   function getBindingsUI() {
     if (!bindingsUI) {
       bindingsUI = createBindingsUI(attributes, {
@@ -1054,6 +1426,10 @@
 
   // ============ UI ============
   function bindUI() {
+    setupItemFileInput();
+    setupItemNamesActions();
+    setupItemContextMenu();
+
     document.getElementById('btn-undo').addEventListener('click', () => {
       const s = history.undo();
       if (s) restoreFromSnapshot(s);
@@ -1073,7 +1449,6 @@
       }
     });
 
-    // Атрибуты
     document.getElementById('btn-attributes').addEventListener('click', () => {
       getBindingsUI().open();
     });
@@ -1087,7 +1462,6 @@
       document.getElementById('modal-binding').classList.remove('open');
     });
 
-    // Галерея
     document.getElementById('btn-gallery').addEventListener('click', () => gallery.open());
     document.getElementById('gallery-new').addEventListener('click', async () => {
       const name = prompt('Название персонажа:', 'Персонаж');
@@ -1119,15 +1493,37 @@
 
     document.getElementById('item-save').addEventListener('click', async () => {
       const catId = state.activeCategoryId;
-      const files = document.getElementById('item-file').files;
-      if (!catId || !files || files.length === 0) {
+      if (!catId) {
+        toast('Выберите категорию', 'error');
+        return;
+      }
+      if (pendingFiles.length === 0) {
         toast('Выберите изображения', 'error');
         return;
       }
-      const name = document.getElementById('item-name').value;
+
+      const itemsToAdd = pendingFiles.map(pf => ({
+        name: pf.name.trim() || pf.file.name.replace(/\.[^.]+$/, ''),
+        src: pf.src,
+      }));
+
       document.getElementById('modal-item').classList.remove('open');
-      await addItemsFromFiles(catId, files, name);
+      await addItemsFromPrepared(catId, itemsToAdd);
+      pendingFiles = [];
     });
+
+    // Переименование элемента
+    const itemRenameSave = document.getElementById('item-rename-save');
+    if (itemRenameSave) itemRenameSave.addEventListener('click', saveItemRename);
+    const itemRenameInput = document.getElementById('item-rename-name');
+    if (itemRenameInput) {
+      itemRenameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          saveItemRename();
+        }
+      });
+    }
 
     document.getElementById('btn-export').addEventListener('click', openExportModal);
     setupExportModal();
@@ -1247,12 +1643,6 @@
       document.getElementById('modal-export').classList.remove('open');
       await doExport(exportFormat, exportSize, transparent);
     });
-  }
-
-  function openModalItem(catId) {
-    document.getElementById('item-name').value = '';
-    document.getElementById('item-file').value = '';
-    document.getElementById('modal-item').classList.add('open');
   }
 
   // ============ Инициализация ============
