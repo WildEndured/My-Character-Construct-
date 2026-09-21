@@ -358,7 +358,6 @@
     overflow-y: auto;
     max-height: 38vh;
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-y;
   }
 
   .item-card {
@@ -377,7 +376,9 @@
     text-align: center;
     color: #ccc;
     -webkit-tap-highlight-color: rgba(74,124,255,0.3);
+    transition: border-color 0.15s, transform 0.1s;
   }
+  .item-card:active { transform: scale(0.96); }
   .item-card.active {
     border-color: #4a7cff;
     box-shadow: 0 0 8px rgba(74,124,255,0.5);
@@ -406,17 +407,21 @@
   }
   .item-card .del-x {
     position: absolute;
-    top: 2px; right: 2px;
-    width: 20px; height: 20px;
+    top: 2px;
+    right: 2px;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
-    background: rgba(192,57,43,0.9);
+    background: rgba(192,57,43,0.85);
     color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
+    font-size: 14px;
     z-index: 2;
+    cursor: pointer;
   }
+  .item-card .del-x:active { background: rgba(192,57,43,1); }
   .add-item-btn {
     background: #2a2a2a;
     border: 2px dashed #555;
@@ -486,11 +491,8 @@
   .modal-actions .btn { flex: 1; }
   .hint { font-size: 11px; color: #888; margin-top: 6px; }
 
-  /* ===== Модалка действий с элементом ===== */
-  #modal-item-actions {
-    z-index: 150;
-  }
-
+  /* Модалка действий с элементом */
+  #modal-item-actions { z-index: 150; }
   #modal-item-actions .modal {
     max-width: 360px;
     padding: 20px;
@@ -541,15 +543,10 @@
     justify-content: flex-start;
     padding-left: 20px;
     cursor: pointer;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: rgba(74,124,255,0.4);
   }
+  .item-action-big:last-child { margin-bottom: 0; }
 
-  .item-action-big:last-child {
-    margin-bottom: 0;
-  }
-
-  /* ===== Список файлов ===== */
+  /* Список файлов */
   #item-files-list {
     max-height: 40vh;
     overflow-y: auto;
@@ -620,7 +617,7 @@
   }
   .item-file-row .remove-file:active { background: rgba(192,57,43,0.6); }
 
-  /* ===== Атрибуты ===== */
+  /* Атрибуты */
   #modal-attributes .modal { max-width: 900px; padding: 14px; }
   #modal-category-picker .modal { max-width: 700px; }
 
@@ -733,11 +730,7 @@
     flex-shrink: 0;
   }
   .attr-icon-btn:active { background: rgba(0,0,0,0.45); }
-  .attr-icon-btn.tiny {
-    width: 24px;
-    height: 24px;
-    font-size: 12px;
-  }
+  .attr-icon-btn.tiny { width: 24px; height: 24px; font-size: 12px; }
   .attr-icon-btn.danger { background: rgba(192,57,43,0.5); }
   .attr-icon-btn.small {
     width: 26px;
@@ -788,7 +781,6 @@
   .attr-group-name:focus { background: #1a1a1a; outline: none; }
 
   .attr-group-actions { display: flex; gap: 3px; flex-shrink: 0; }
-
   .attr-group-body { padding: 6px; }
 
   .attr-row {
@@ -921,7 +913,7 @@
   }
   .attr-add-group-btn:active { background: #333; }
 
-  /* ===== Автокомплит ===== */
+  /* Автокомплит */
   .attr-autocomplete {
     position: fixed;
     z-index: 600;
@@ -946,9 +938,7 @@
     color: #fff;
   }
   .attr-autocomplete-item:hover,
-  .attr-autocomplete-item:active {
-    background: #4a7cff;
-  }
+  .attr-autocomplete-item:active { background: #4a7cff; }
   .attr-autocomplete-item img {
     width: 32px;
     height: 32px;
@@ -977,7 +967,7 @@
     color: #888;
   }
 
-  /* ===== Сетка категорий ===== */
+  /* Сетка категорий */
   .category-picker-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
@@ -1021,7 +1011,7 @@
   }
   .category-pick-card .cat-meta { font-size: 10px; color: #888; }
 
-  /* ===== Галерея ===== */
+  /* Галерея */
   #gallery-modal .modal { max-width: 700px; }
   .gallery-grid {
     display: grid;
@@ -1068,7 +1058,7 @@
     font-size: 12px;
   }
 
-  /* ===== Слои ===== */
+  /* Слои */
   .layer-row {
     display: flex;
     align-items: center;
@@ -1308,7 +1298,7 @@
   <div id="categories"></div>
 </div>
 
-<!-- Модалка: новая категория -->
+<!-- Новая категория -->
 <div class="modal-bg" id="modal-cat">
   <div class="modal">
     <h3>Новая категория</h3>
@@ -1321,7 +1311,7 @@
   </div>
 </div>
 
-<!-- Модалка: редактирование категории -->
+<!-- Редактирование категории -->
 <div class="modal-bg" id="modal-cat-edit">
   <div class="modal">
     <h3>Категория</h3>
@@ -1342,7 +1332,7 @@
   </div>
 </div>
 
-<!-- Модалка: добавление элементов -->
+<!-- Добавление элементов -->
 <div class="modal-bg" id="modal-item">
   <div class="modal">
     <h3>Добавить элементы</h3>
@@ -1365,7 +1355,7 @@
   </div>
 </div>
 
-<!-- Модалка: действия с элементом -->
+<!-- Действия с элементом -->
 <div class="modal-bg" id="modal-item-actions">
   <div class="modal" style="max-width:360px;">
     <div class="item-action-preview-wrap">
@@ -1381,7 +1371,7 @@
   </div>
 </div>
 
-<!-- Модалка: переименование элемента -->
+<!-- Переименование элемента -->
 <div class="modal-bg" id="modal-item-rename">
   <div class="modal">
     <h3>Переименовать элемент</h3>
@@ -1394,12 +1384,12 @@
   </div>
 </div>
 
-<!-- Модалка: слои -->
+<!-- Слои -->
 <div class="modal-bg" id="modal-layers">
   <div class="modal">
     <h3>Слои (порядок отрисовки)</h3>
     <div class="hint" style="margin-bottom:12px;">
-      Перетащите за ⠿ для изменения порядка. Верхний = рисуется последним.
+      Верхний = рисуется последним.
     </div>
     <div id="layers-list"></div>
     <div class="modal-actions">
@@ -1408,7 +1398,7 @@
   </div>
 </div>
 
-<!-- Модалка: галерея -->
+<!-- Галерея -->
 <div class="modal-bg" id="gallery-modal">
   <div class="modal">
     <h3>Мои персонажи</h3>
@@ -1423,7 +1413,7 @@
   </div>
 </div>
 
-<!-- Модалка: экспорт -->
+<!-- Экспорт -->
 <div class="modal-bg" id="modal-export">
   <div class="modal">
     <h3>Экспорт</h3>
@@ -1461,7 +1451,7 @@
   </div>
 </div>
 
-<!-- Модалка: импорт -->
+<!-- Импорт -->
 <div class="modal-bg" id="modal-import">
   <div class="modal">
     <h3>Импорт проекта</h3>
@@ -1475,7 +1465,7 @@
   </div>
 </div>
 
-<!-- Модалка: атрибуты -->
+<!-- Атрибуты -->
 <div class="modal-bg" id="modal-attributes">
   <div class="modal">
     <div class="attr-modal-header">
@@ -1497,7 +1487,7 @@
   </div>
 </div>
 
-<!-- Модалка: выбор категории -->
+<!-- Выбор категории -->
 <div class="modal-bg" id="modal-category-picker">
   <div class="modal">
     <h3>📁 Привязать к категории</h3>
