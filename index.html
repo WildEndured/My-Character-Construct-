@@ -75,6 +75,7 @@
     justify-content: center;
     transition: background 0.15s, transform 0.1s;
     flex-shrink: 0;
+    -webkit-tap-highlight-color: rgba(74,124,255,0.3);
   }
   .btn:active { background: #4a4a4a; transform: scale(0.96); }
   .btn.primary { background: #4a7cff; border-color: #4a7cff; }
@@ -357,6 +358,7 @@
     overflow-y: auto;
     max-height: 38vh;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
   }
 
   .item-card {
@@ -374,7 +376,7 @@
     padding: 4px;
     text-align: center;
     color: #ccc;
-    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(74,124,255,0.3);
   }
   .item-card.active {
     border-color: #4a7cff;
@@ -485,9 +487,15 @@
   .hint { font-size: 11px; color: #888; margin-top: 6px; }
 
   /* ===== Модалка действий с элементом ===== */
+  #modal-item-actions {
+    z-index: 150;
+  }
+
   #modal-item-actions .modal {
     max-width: 360px;
     padding: 20px;
+    display: flex;
+    flex-direction: column;
   }
 
   .item-action-preview-wrap {
@@ -506,6 +514,7 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    flex-shrink: 0;
   }
 
   .item-action-preview img {
@@ -527,10 +536,13 @@
   .item-action-big {
     width: 100%;
     margin-bottom: 8px;
-    min-height: 48px;
+    min-height: 52px;
     font-size: 15px;
     justify-content: flex-start;
     padding-left: 20px;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(74,124,255,0.4);
   }
 
   .item-action-big:last-child {
