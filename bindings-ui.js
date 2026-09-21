@@ -47,7 +47,6 @@
       const query = globalQuery.trim().toLowerCase();
 
       for (const mod of schema.modules) {
-        // Проверяем, есть ли подходящие атрибуты
         const modMatches = !query || mod.name.toLowerCase().includes(query) ||
           mod.groups.some(g => g.name.toLowerCase().includes(query) ||
             g.rows.some(r => r.label.toLowerCase().includes(query) ||
@@ -59,7 +58,6 @@
         modEl.className = 'attr-module';
         modEl.style.borderLeftColor = mod.color || '#4a7cff';
 
-        // ===== Header модуля =====
         const header = document.createElement('div');
         header.className = 'attr-module-header';
         header.style.background = mod.color || '#4a7cff';
@@ -80,12 +78,12 @@
         title.addEventListener('change', () => {
           attributes.renameModule(mod.id, title.value);
         });
+        title.addEventListener('click', (e) => e.stopPropagation());
         header.appendChild(title);
 
         const actions = document.createElement('div');
         actions.className = 'attr-module-actions';
 
-        // Кнопка рандома
         const randomBtn = document.createElement('button');
         randomBtn.className = 'attr-icon-btn';
         randomBtn.textContent = '🎲';
@@ -129,7 +127,6 @@
 
         header.appendChild(actions);
 
-        // Клик по шапке — сворачивает
         header.addEventListener('click', (e) => {
           if (e.target.closest('.attr-icon-btn') || e.target.closest('input')) return;
           attributes.toggleModuleCollapsed(mod.id);
@@ -138,13 +135,11 @@
 
         modEl.appendChild(header);
 
-        // ===== Body модуля =====
         if (!mod.collapsed) {
           const body = document.createElement('div');
           body.className = 'attr-module-body';
 
           for (const grp of mod.groups) {
-            // Проверка по query
             const grpMatches = !query || grp.name.toLowerCase().includes(query) ||
               grp.rows.some(r => r.label.toLowerCase().includes(query) ||
                 (r.value && r.value.toLowerCase().includes(query)));
@@ -154,7 +149,6 @@
             const grpEl = document.createElement('div');
             grpEl.className = 'attr-group';
 
-            // Шапка группы
             const grpHeader = document.createElement('div');
             grpHeader.className = 'attr-group-header';
 
@@ -175,7 +169,6 @@
             const grpActions = document.createElement('div');
             grpActions.className = 'attr-group-actions';
 
-            // Рандом группы
             const grpRandomBtn = document.createElement('button');
             grpRandomBtn.className = 'attr-icon-btn tiny';
             grpRandomBtn.textContent = '🎲';
@@ -219,7 +212,6 @@
 
             grpHeader.appendChild(grpActions);
 
-            // Клик по шапке группы — сворачивает
             grpHeader.addEventListener('click', (e) => {
               if (e.target.closest('.attr-icon-btn') || e.target.closest('input')) return;
               attributes.toggleGroupCollapsed(mod.id, grp.id);
@@ -228,19 +220,16 @@
 
             grpEl.appendChild(grpHeader);
 
-            // Тело группы
             if (!grp.collapsed) {
               const grpBody = document.createElement('div');
               grpBody.className = 'attr-group-body';
 
               for (const row of grp.rows) {
-                // Фильтр по query
                 if (query &&
                     !row.label.toLowerCase().includes(query) &&
                     !(row.value && row.value.toLowerCase().includes(query))) {
                   continue;
                 }
-
                 const rowEl = renderAttributeRow(row, mod, state);
                 grpBody.appendChild(rowEl);
               }
@@ -251,7 +240,6 @@
             body.appendChild(grpEl);
           }
 
-          // Кнопка "добавить группу" в конце
           const addGroupFoot = document.createElement('button');
           addGroupFoot.className = 'attr-add-group-btn';
           addGroupFoot.textContent = '📁 Добавить группу';
@@ -276,8 +264,8 @@
     function renderAttributeRow(row, mod, state) {
       const rowEl = document.createElement('div');
       rowEl.className = 'attr-row';
+      rowEl.dataset.attrId = row.id;
 
-      // Название
       const label = document.createElement('input');
       label.className = 'attr-row-label';
       label.value = row.label;
@@ -286,7 +274,6 @@
       });
       rowEl.appendChild(label);
 
-      // Кнопка выбора категории
       const catBtn = document.createElement('button');
       catBtn.className = 'attr-cat-btn';
       const boundCat = row.categoryId
@@ -304,81 +291,83 @@
       });
       rowEl.appendChild(catBtn);
 
-      // Обёртка для значения + превью + статус
       const valueWrap = document.createElement('div');
       valueWrap.className = 'attr-value-wrap';
+      valueWrap.dataset.attrId = row.id;
 
-      // Поле значения (клик открывает автокомплит)
       const valueInput = document.createElement('input');
       valueInput.className = 'attr-row-value';
       valueInput.value = row.value || '';
       valueInput.placeholder = boundCat ? 'выберите элемент…' : '—';
       valueInput.dataset.attrId = row.id;
       valueInput.autocomplete = 'off';
+      valueInput.spellcheck = false;
       valueInput.disabled = !row.categoryId;
 
       // Фокус — открываем автокомплит
       valueInput.addEventListener('focus', () => {
         if (boundCat) {
-          openAutocomplete(row.id, valueInput, catBtn, valueWrap);
+          openAutocomplete(row.id, valueInput, valueWrap);
         }
       });
 
       // Ввод — фильтруем
       valueInput.addEventListener('input', () => {
-        row.value = valueInput.value;
         attributes.setAttributeValue(row.id, valueInput.value);
-        updateStatusBadge(valueWrap, row, boundCat);
-        if (boundCat) {
-          updateAutocompleteList(row.id, valueInput.value, boundCat);
+        updateStatusBadge(valueWrap, row.id);
+        if (boundCat && activeAutocomplete && activeAutocomplete.attrId === row.id) {
+          renderAutocompleteList(valueInput.value);
         }
       });
 
-      // Enter — закрываем
       valueInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
+          e.preventDefault();
           valueInput.blur();
           closeAutocomplete();
         } else if (e.key === 'Escape') {
           closeAutocomplete();
+          valueInput.blur();
         }
       });
 
+      // Не закрываем автокомплит, если нажали на элемент списка
       valueInput.addEventListener('blur', () => {
-        // Задержка, чтобы клик по варианту сработал
-        setTimeout(() => closeAutocomplete(), 200);
+        setTimeout(() => {
+          if (activeAutocomplete && activeAutocomplete.attrId === row.id) {
+            closeAutocomplete();
+          }
+        }, 150);
       });
 
       valueWrap.appendChild(valueInput);
 
-      // Кнопка быстрого выбора
       if (boundCat) {
         const quickBtn = document.createElement('button');
         quickBtn.className = 'attr-quick-pick';
+        quickBtn.type = 'button';
         quickBtn.textContent = '▼';
         quickBtn.title = 'Показать все элементы';
-        quickBtn.addEventListener('click', (e) => {
+        // Используем pointerdown, чтобы не терять фокус input
+        quickBtn.addEventListener('pointerdown', (e) => {
           e.preventDefault();
           valueInput.focus();
-          openAutocomplete(row.id, valueInput, catBtn, valueWrap, true);
+          openAutocomplete(row.id, valueInput, valueWrap, true);
         });
         valueWrap.appendChild(quickBtn);
       }
 
-      // Превью активного элемента
       const preview = document.createElement('div');
       preview.className = 'attr-preview';
       valueWrap.appendChild(preview);
 
-      // Статус-индикатор
       const status = document.createElement('div');
-      status.className = 'attr-status';
+      status.className = 'attr-status neutral';
       valueWrap.appendChild(status);
 
       rowEl.appendChild(valueWrap);
-      updateStatusBadge(valueWrap, row, boundCat);
+      updateStatusBadge(valueWrap, row.id);
 
-      // Удаление
       const delBtn2 = document.createElement('button');
       delBtn2.className = 'attr-icon-btn small';
       delBtn2.textContent = '×';
@@ -392,40 +381,46 @@
       return rowEl;
     }
 
-    // Обновление превью и статуса
-    function updateStatusBadge(valueWrap, row, boundCat) {
+    // Обновление статуса — ищем valueWrap по attrId в DOM
+    function updateStatusBadge(valueWrap, attrId) {
+      if (!valueWrap) {
+        valueWrap = list.querySelector(`.attr-value-wrap[data-attr-id="${attrId}"]`);
+      }
+      if (!valueWrap) return;
+
       const preview = valueWrap.querySelector('.attr-preview');
       const status = valueWrap.querySelector('.attr-status');
+      if (!preview || !status) return;
 
       preview.innerHTML = '';
-      status.className = 'attr-status';
+      status.className = 'attr-status neutral';
       status.textContent = '';
 
-      if (!boundCat) {
-        status.classList.add('neutral');
-        return;
-      }
+      const rowData = attributes.getAttribute(attrId);
+      if (!rowData) return;
+      const row = rowData.row;
+
+      const state = ctx.getState();
+      const boundCat = row.categoryId
+        ? state.categories.find(c => c.id === row.categoryId)
+        : null;
+
+      if (!boundCat) return;
 
       const value = (row.value || '').trim();
-      if (!value) {
-        status.classList.add('neutral');
-        return;
-      }
+      if (!value) return;
 
-      // Ищем элемент
       const item = attributes.findItemForValue(boundCat, value);
       if (item) {
-        // Точное или нормализованное совпадение
         const exact = item.name.toLowerCase() === value.toLowerCase() ||
                       attributes.normalizeName(item.name) === attributes.normalizeName(value);
         if (exact) {
-          status.classList.add('ok');
+          status.className = 'attr-status ok';
           status.textContent = '✓';
         } else {
-          status.classList.add('partial');
+          status.className = 'attr-status partial';
           status.textContent = '~';
         }
-        // Превью
         if (item.src) {
           const img = document.createElement('img');
           img.src = item.src;
@@ -434,13 +429,19 @@
           preview.appendChild(img);
         }
       } else {
-        status.classList.add('error');
+        status.className = 'attr-status error';
         status.textContent = '⚠';
       }
     }
 
     // ============ Автокомплит ============
-    function openAutocomplete(attrId, input, catBtn, valueWrap, showAll) {
+    function openAutocomplete(attrId, input, valueWrap, showAll) {
+      // Если уже открыт для этого атрибута — только обновляем список
+      if (activeAutocomplete && activeAutocomplete.attrId === attrId) {
+        renderAutocompleteList(showAll ? '' : (input.value || ''));
+        return;
+      }
+
       closeAutocomplete();
 
       const rowData = attributes.getAttribute(attrId);
@@ -448,7 +449,6 @@
       const cat = ctx.getState().categories.find(c => c.id === rowData.row.categoryId);
       if (!cat || cat.items.length === 0) return;
 
-      // Создаём контейнер автокомплита
       const ac = document.createElement('div');
       ac.className = 'attr-autocomplete';
       ac.dataset.attrId = attrId;
@@ -456,24 +456,19 @@
       const rect = input.getBoundingClientRect();
       ac.style.left = rect.left + 'px';
       ac.style.top = (rect.bottom + 4) + 'px';
-      ac.style.minWidth = Math.max(rect.width, 220) + 'px';
+      ac.style.minWidth = Math.max(rect.width, 240) + 'px';
+      ac.style.maxWidth = Math.min(window.innerWidth - 16, 400) + 'px';
 
       document.body.appendChild(ac);
 
-      activeAutocomplete = { el: ac, attrId, input, cat, catBtn, valueWrap };
+      activeAutocomplete = { el: ac, attrId, input, cat, valueWrap };
 
-      const query = showAll ? '' : (input.value || '');
-      renderAutocompleteList(query);
-    }
-
-    function updateAutocompleteList(attrId, query, cat) {
-      if (!activeAutocomplete || activeAutocomplete.attrId !== attrId) return;
-      renderAutocompleteList(query);
+      renderAutocompleteList(showAll ? '' : (input.value || ''));
     }
 
     function renderAutocompleteList(query) {
       if (!activeAutocomplete) return;
-      const { el, cat } = activeAutocomplete;
+      const { el, cat, attrId, valueWrap } = activeAutocomplete;
 
       const q = (query || '').trim().toLowerCase();
       const items = cat.items.filter(it => {
@@ -491,7 +486,6 @@
         return;
       }
 
-      // Ограничим 50 элементами
       const limited = items.slice(0, 50);
       for (const item of limited) {
         const opt = document.createElement('div');
@@ -507,33 +501,35 @@
 
         const nameEl = document.createElement('div');
         nameEl.className = 'attr-autocomplete-name';
-        nameEl.textContent = item.name;
-        opt.appendChild(nameEl);
 
-        // Подсветка совпадения
         if (q) {
           const idx = item.name.toLowerCase().indexOf(q);
           if (idx >= 0) {
             const before = item.name.slice(0, idx);
             const match = item.name.slice(idx, idx + q.length);
             const after = item.name.slice(idx + q.length);
-            nameEl.textContent = '';
             nameEl.append(before);
             const mark = document.createElement('mark');
             mark.textContent = match;
             nameEl.append(mark);
             nameEl.append(after);
+          } else {
+            nameEl.textContent = item.name;
           }
+        } else {
+          nameEl.textContent = item.name;
         }
+        opt.appendChild(nameEl);
 
-        opt.addEventListener('mousedown', (e) => {
-          e.preventDefault(); // не даём input потерять фокус
-          selectAutocompleteItem(item);
-        });
-        opt.addEventListener('touchstart', (e) => {
+        // Используем pointerdown — срабатывает раньше blur
+        const onPick = (e) => {
           e.preventDefault();
-          selectAutocompleteItem(item);
-        }, { passive: false });
+          e.stopPropagation();
+          selectAutocompleteItem(item, attrId, valueWrap);
+        };
+        opt.addEventListener('pointerdown', onPick);
+        opt.addEventListener('touchstart', onPick, { passive: false });
+        opt.addEventListener('click', onPick);
 
         el.appendChild(opt);
       }
@@ -546,18 +542,19 @@
       }
     }
 
-    function selectAutocompleteItem(item) {
-      if (!activeAutocomplete) return;
-      const { attrId, input, valueWrap } = activeAutocomplete;
+    function selectAutocompleteItem(item, attrId, valueWrap) {
       const rowData = attributes.getAttribute(attrId);
       if (!rowData) return;
 
-      input.value = item.name;
       rowData.row.value = item.name;
       attributes.setAttributeValue(attrId, item.name);
 
-      const boundCat = ctx.getState().categories.find(c => c.id === rowData.row.categoryId);
-      updateStatusBadge(valueWrap, rowData.row, boundCat);
+      // Обновляем input и статус
+      const input = list.querySelector(`.attr-row-value[data-attr-id="${attrId}"]`);
+      if (input) input.value = item.name;
+
+      const wrap = valueWrap || list.querySelector(`.attr-value-wrap[data-attr-id="${attrId}"]`);
+      updateStatusBadge(wrap, attrId);
 
       closeAutocomplete();
     }
@@ -569,20 +566,25 @@
       }
     }
 
-    // Клик вне — закрыть
-    document.addEventListener('mousedown', (e) => {
-      if (activeAutocomplete && !activeAutocomplete.el.contains(e.target) &&
-          e.target !== activeAutocomplete.input) {
-        closeAutocomplete();
-      }
-    });
-    document.addEventListener('touchstart', (e) => {
-      if (activeAutocomplete && !activeAutocomplete.el.contains(e.target) &&
-          e.target !== activeAutocomplete.input) {
-        closeAutocomplete();
-      }
-    }, { passive: true });
-    window.addEventListener('scroll', closeAutocomplete, { passive: true, capture: true });
+    // Закрытие при клике вне — используем pointerdown
+    document.addEventListener('pointerdown', (e) => {
+      if (!activeAutocomplete) return;
+      if (activeAutocomplete.el.contains(e.target)) return;
+      if (e.target === activeAutocomplete.input) return;
+      // Быстрый выбор ▼
+      if (e.target.classList && e.target.classList.contains('attr-quick-pick')) return;
+      // Внутри модалки атрибутов — не закрываем если это поле значения
+      if (e.target.classList && e.target.classList.contains('attr-row-value')) return;
+      closeAutocomplete();
+    }, true);
+
+    // Не закрываем при скролле внутри автокомплита
+    window.addEventListener('scroll', (e) => {
+      if (!activeAutocomplete) return;
+      if (activeAutocomplete.el.contains(e.target)) return;
+      closeAutocomplete();
+    }, { passive: true, capture: true });
+
     window.addEventListener('resize', closeAutocomplete);
 
     // ============ Выбор категории ============
@@ -699,7 +701,6 @@
       pickerCancel.addEventListener('click', closeCategoryPicker);
     }
 
-    // Кнопка глобального рандома
     const randomAllBtn = document.getElementById('attr-random-all');
     if (randomAllBtn) {
       randomAllBtn.addEventListener('click', () => {
