@@ -1,4 +1,4 @@
-/* attributes.js — атрибуты с привязкой к КАТЕГОРИИ, группами и рандомом */
+/* attributes.js — система атрибутов с привязкой к КАТЕГОРИИ, группами и рандомом */
 (function(global) {
   'use strict';
 
@@ -166,7 +166,6 @@
       state.attributes = clone(schema);
     }
 
-    // Обход всех строк
     function forEachRow(callback) {
       for (const mod of schema.modules) {
         for (const grp of mod.groups) {
@@ -223,7 +222,6 @@
       if (mod) {
         mod.collapsed = !mod.collapsed;
         saveToState();
-        // Не пишем в историю — это чисто UI
       }
     }
 
@@ -269,7 +267,6 @@
       if (grp) {
         grp.collapsed = !grp.collapsed;
         saveToState();
-        // Не пишем в историю
       }
     }
 
@@ -361,7 +358,6 @@
       return found.row.categoryId || null;
     }
 
-    // Найти элемент по значению в категории
     function findItemForValue(cat, value) {
       if (!cat || !value) return null;
       const target = value.trim();
@@ -441,15 +437,11 @@
     }
 
     // ============ Рандомное заполнение ============
-    /**
-     * Заполнить указанные атрибуты случайными значениями из привязанных категорий
-     * @param {Array<string>} attrIds — если не указано, заполняем все привязанные
-     */
     function randomizeAttributes(attrIds) {
       const state = ctx.getState();
       let count = 0;
-
       const ids = attrIds || null;
+
       forEachRow(row => {
         if (ids && !ids.includes(row.id)) return;
         if (!row.categoryId) return;
@@ -468,9 +460,6 @@
       return count;
     }
 
-    /**
-     * Рандомизировать конкретный модуль
-     */
     function randomizeModule(moduleId) {
       const mod = schema.modules.find(m => m.id === moduleId);
       if (!mod) return 0;
@@ -481,9 +470,6 @@
       return randomizeAttributes(ids);
     }
 
-    /**
-     * Рандомизировать конкретную группу
-     */
     function randomizeGroup(moduleId, groupId) {
       const mod = schema.modules.find(m => m.id === moduleId);
       if (!mod) return 0;
