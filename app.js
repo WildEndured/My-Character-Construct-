@@ -20,8 +20,29 @@
     gridOn: false, checkerOn: false, centerOn: false,
   };
 
+  // Уникальный id — защита от конфликтов с загруженными данными
   let uid = 1;
-  const nextId = () => 'id_' + (uid++);
+  const nextId = () => 'id_' + Date.now() + '_' + (uid++);
+
+  // Синхронизация uid после загрузки проекта
+  function syncUidFromState() {
+    let maxNumeric = 0;
+    const allIds = [];
+    for (const cat of state.categories) {
+      allIds.push(cat.id);
+      for (const it of cat.items) allIds.push(it.id);
+    }
+    for (const id of allIds) {
+      const matches = String(id).match(/\d+/g);
+      if (matches) {
+        for (const m of matches) {
+          const n = parseInt(m, 10);
+          if (!isNaN(n) && n > maxNumeric && n < Date.now()) maxNumeric = n;
+        }
+      }
+    }
+    uid = maxNumeric + 1;
+  }
 
   const canvas = document.getElementById('canvas');
   const canvasWrap = document.getElementById('canvas-wrap');
@@ -628,12 +649,14 @@
   }
 
   function openCategory(catId) {
+    const cat = state.categories.find(c => c.id === catId);
+    if (!cat) return;
+
     state.activeCategoryId = catId;
     renderCategories();
     renderItems();
     itemsPanel.classList.add('open');
-    const cat = state.categories.find(c => c.id === catId);
-    itemsTitle.textContent = cat ? cat.name : '';
+    itemsTitle.textContent = cat.name;
     requestAnimationFrame(() => {
       const tab = categoriesEl.querySelector(`.cat-tab[data-id="${catId}"]`);
       if (tab) tab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
@@ -641,9 +664,16 @@
   }
 
   function addCategory(name, icon) {
+    // Проверка на дубликат по имени
+    const trimmedName = (name || '').trim();
+    if (!trimmedName) {
+      toast('Введите название', 'error');
+      return null;
+    }
+
     const cat = {
       id: nextId(),
-      name: name.trim() || 'Без названия',
+      name: trimmedName,
       icon: icon || undefined,
       visible: true,
       opacity: 1,
@@ -654,6 +684,7 @@
     renderCategories();
     openCategory(cat.id);
     commit('add-category');
+    return cat;
   }
 
   function deleteCategory(catId) {
@@ -710,7 +741,6 @@
       });
       card.appendChild(del);
 
-      // === Универсальный тап ===
       let tapHandled = false;
       const onTap = (e) => {
         if (e.target && e.target.closest && e.target.closest('.del-x')) return;
@@ -884,14 +914,32 @@
 
   // ============ Модалка добавления ============
   let pendingFiles = [];
+  let pendingTargetCatId = null;
 
   function openModalItem(catId) {
+    // Проверяем категорию
+    const cat = state.categories.find(c => c.id === catId);
+    if (!cat) {
+      toast('Категория не найдена', 'error');
+      return;
+    }
+
+    // Фиксируем категорию — куда будут добавлены элементы
+    pendingTargetCatId = catId;
     pendingFiles = [];
+
     document.getElementById('item-file').value = '';
     document.getElementById('item-files-list').innerHTML = '';
     document.getElementById('item-files-list-wrap').style.display = 'none';
     document.getElementById('item-files-count').textContent = '';
     document.getElementById('item-save').disabled = true;
+
+    // Показываем, куда добавляем
+    const hintEl = document.querySelector('#modal-item .hint');
+    if (hintEl) {
+      hintEl.textContent = `Будут добавлены в категорию: «${cat.name}»`;
+    }
+
     document.getElementById('modal-item').classList.add('open');
   }
 
@@ -1061,8 +1109,12 @@
   }
 
   async function addItemsFromPrepared(catId, items) {
+    // Жёсткая проверка на валидность категории
     const cat = state.categories.find(c => c.id === catId);
-    if (!cat) return;
+    if (!cat) {
+      toast('Категория не найдена', 'error');
+      return;
+    }
     if (!items || items.length === 0) return;
 
     showProgress('Добавление...', 0);
@@ -1081,6 +1133,8 @@
           transform: null,
         };
         cat.items.push(item);
+
+        // Автовыбор: ТОЛЬКО если в ЭТОЙ категории ещё нет активного элемента
         if (i === 0 && !state.activeItems[cat.id]) {
           state.activeItems[cat.id] = item.id;
         }
@@ -1093,7 +1147,7 @@
     renderer.invalidate(catId);
     renderItems();
     commit('add-items');
-    toast(`Добавлено: ${items.length}`);
+    toast(`Добавлено: ${items.length} в «${cat.name}»`);
   }
 
   function readFileAsDataURL(file) {
@@ -1405,6 +1459,7 @@
     loadState: (newState) => {
       renderer.invalidateAll();
       state = { ...newState };
+      syncUidFromState();
       if (state.attributes) {
         attributes.deserialize(state.attributes);
       } else {
@@ -1530,9 +1585,17 @@
     });
 
     document.getElementById('item-save').addEventListener('click', async () => {
-      const catId = state.activeCategoryId;
+      // Используем ЗАФИКСИРОВАННУЮ категорию из openModalItem
+      const catId = pendingTargetCatId;
       if (!catId) {
-        toast('Выберите категорию', 'error');
+        toast('Категория не выбрана', 'error');
+        return;
+      }
+      if (!state.categories.find(c => c.id === catId)) {
+        toast('Категория была удалена', 'error');
+        pendingTargetCatId = null;
+        pendingFiles = [];
+        document.getElementById('modal-item').classList.remove('open');
         return;
       }
       if (pendingFiles.length === 0) {
@@ -1547,7 +1610,10 @@
 
       document.getElementById('modal-item').classList.remove('open');
       await addItemsFromPrepared(catId, itemsToAdd);
+
+      // Сброс
       pendingFiles = [];
+      pendingTargetCatId = null;
     });
 
     const itemRenameSave = document.getElementById('item-rename-save');
@@ -1594,6 +1660,7 @@
       state.canvasBg = '#ffffff';
       state.attributes = null;
       attributes.reset();
+      uid = 1;
       renderCategories();
       itemsPanel.classList.remove('open');
       history.reset(snapshot());
@@ -1691,6 +1758,7 @@
       const projects = await Storage.getAllProjects();
       if (projects.length > 0) {
         await gallery.loadProject(projects[0].id);
+        syncUidFromState();
       } else {
         addCategory('Тело');
         addCategory('Глаза');
