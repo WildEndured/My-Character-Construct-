@@ -1242,18 +1242,17 @@
   </div>
 </div>
 
-<!-- ===== Модалка: выбор привязки ===== -->
-<div class="modal-bg" id="modal-binding">
+<!-- ===== Модалка: выбор категории для атрибута ===== -->
+<div class="modal-bg" id="modal-category-picker">
   <div class="modal">
-    <h3>⚭ Привязка атрибута</h3>
+    <h3>📁 Привязать к категории</h3>
     <div style="margin-bottom:12px;">
-      Атрибут: <strong id="binding-attr-name">—</strong>
+      Атрибут: <strong id="category-picker-attr-name">—</strong>
     </div>
-    <div id="binding-slots-bar"></div>
-    <input type="text" id="binding-search" placeholder="🔍 Поиск элемента...">
-    <div id="binding-list" style="margin-top:12px;"></div>
+    <input type="text" id="category-picker-search" placeholder="🔍 Поиск категории...">
+    <div id="category-picker-list" class="category-picker-grid"></div>
     <div class="modal-actions">
-      <button class="btn" id="binding-cancel">Отмена</button>
+      <button class="btn" id="category-picker-cancel">Отмена</button>
     </div>
   </div>
 </div>
