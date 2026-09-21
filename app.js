@@ -99,7 +99,6 @@
     });
   }
 
-  // Дебаунс истории — не блокирует UI
   let historyDebounceTimer = null;
   let pendingHistoryLabel = null;
 
@@ -704,13 +703,25 @@
         e.stopPropagation();
         deleteItem(cat.id, item.id);
       });
+      del.addEventListener('touchend', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        deleteItem(cat.id, item.id);
+      });
       card.appendChild(del);
 
-      // Единственный обработчик — тап открывает меню действий
-      card.addEventListener('click', (e) => {
-        if (e.target.closest('.del-x')) return;
+      // === Универсальный тап ===
+      let tapHandled = false;
+      const onTap = (e) => {
+        if (e.target && e.target.closest && e.target.closest('.del-x')) return;
+        if (tapHandled) return;
+        tapHandled = true;
+        setTimeout(() => { tapHandled = false; }, 400);
         openItemActionMenu(cat.id, item.id);
-      });
+      };
+
+      card.addEventListener('touchend', onTap);
+      card.addEventListener('click', onTap);
 
       itemsList.appendChild(card);
     }
@@ -718,7 +729,17 @@
     const addBtn = document.createElement('div');
     addBtn.className = 'item-card add-item-btn';
     addBtn.textContent = '＋';
-    addBtn.addEventListener('click', () => openModalItem(cat.id));
+
+    let addHandled = false;
+    const onAddTap = (e) => {
+      if (addHandled) return;
+      addHandled = true;
+      setTimeout(() => { addHandled = false; }, 400);
+      openModalItem(cat.id);
+    };
+    addBtn.addEventListener('touchend', onAddTap);
+    addBtn.addEventListener('click', onAddTap);
+
     itemsList.appendChild(addBtn);
   }
 
@@ -733,27 +754,36 @@
 
     actionMenuData = { catId, itemId };
     const modal = document.getElementById('modal-item-actions');
+    if (!modal) {
+      toggleItem(catId, itemId);
+      return;
+    }
+
     const preview = document.getElementById('item-action-preview');
     const nameEl = document.getElementById('item-action-name');
     const selectBtn = document.getElementById('item-action-select');
     const isActive = state.activeItems[catId] === itemId;
 
-    preview.innerHTML = '';
-    if (item.src) {
-      const img = document.createElement('img');
-      img.src = item.src;
-      img.alt = item.name;
-      preview.appendChild(img);
+    if (preview) {
+      preview.innerHTML = '';
+      if (item.src) {
+        const img = document.createElement('img');
+        img.src = item.src;
+        img.alt = item.name;
+        preview.appendChild(img);
+      }
     }
 
-    nameEl.textContent = item.name || 'Без названия';
+    if (nameEl) nameEl.textContent = item.name || 'Без названия';
 
-    if (isActive) {
-      selectBtn.textContent = '✕ Снять выбор';
-      selectBtn.className = 'btn item-action-big';
-    } else {
-      selectBtn.textContent = '✓ Выбрать';
-      selectBtn.className = 'btn primary item-action-big';
+    if (selectBtn) {
+      if (isActive) {
+        selectBtn.textContent = '✕ Снять выбор';
+        selectBtn.className = 'btn item-action-big';
+      } else {
+        selectBtn.textContent = '✓ Выбрать';
+        selectBtn.className = 'btn primary item-action-big';
+      }
     }
 
     modal.classList.add('open');
@@ -761,7 +791,8 @@
   }
 
   function closeItemActionMenu() {
-    document.getElementById('modal-item-actions').classList.remove('open');
+    const modal = document.getElementById('modal-item-actions');
+    if (modal) modal.classList.remove('open');
     actionMenuData = null;
   }
 
@@ -769,43 +800,57 @@
     const modal = document.getElementById('modal-item-actions');
     if (!modal) return;
 
-    document.getElementById('item-action-select').addEventListener('click', () => {
+    const bindBtn = (id, handler) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      let handled = false;
+      const run = (e) => {
+        if (handled) return;
+        handled = true;
+        setTimeout(() => { handled = false; }, 400);
+        if (e && e.preventDefault) e.preventDefault();
+        if (e && e.stopPropagation) e.stopPropagation();
+        handler();
+      };
+      btn.addEventListener('touchend', run);
+      btn.addEventListener('click', run);
+    };
+
+    bindBtn('item-action-select', () => {
       if (!actionMenuData) return;
       const { catId, itemId } = actionMenuData;
       toggleItem(catId, itemId);
       closeItemActionMenu();
     });
 
-    document.getElementById('item-action-rename').addEventListener('click', () => {
+    bindBtn('item-action-rename', () => {
       if (!actionMenuData) return;
       const { catId, itemId } = actionMenuData;
       closeItemActionMenu();
       setTimeout(() => openItemRename(catId, itemId), 200);
     });
 
-    document.getElementById('item-action-duplicate').addEventListener('click', () => {
+    bindBtn('item-action-duplicate', () => {
       if (!actionMenuData) return;
       const { catId, itemId } = actionMenuData;
       closeItemActionMenu();
       duplicateItem(catId, itemId);
     });
 
-    document.getElementById('item-action-delete').addEventListener('click', () => {
+    bindBtn('item-action-delete', () => {
       if (!actionMenuData) return;
       const { catId, itemId } = actionMenuData;
       closeItemActionMenu();
       deleteItem(catId, itemId);
     });
 
-    document.getElementById('item-action-cancel').addEventListener('click', closeItemActionMenu);
+    bindBtn('item-action-cancel', closeItemActionMenu);
 
-    // Закрытие по фону
     modal.addEventListener('click', (e) => {
       if (e.target === modal) closeItemActionMenu();
     });
   }
 
-  // Мгновенное переключение
   function toggleItem(catId, itemId) {
     const cat = state.categories.find(c => c.id === catId);
     if (!cat) return;
