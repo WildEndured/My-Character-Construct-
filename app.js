@@ -89,6 +89,7 @@
     };
   }
 
+  // ============ Рендер с дебаунсом ============
   let renderScheduled = false;
   function scheduleRender() {
     if (renderScheduled) return;
@@ -99,7 +100,32 @@
     });
   }
 
+  // ============ История с дебаунсом (не блокирует UI) ============
+  let historyDebounceTimer = null;
+  let pendingHistoryLabel = null;
+
+  function scheduleHistory(label) {
+    pendingHistoryLabel = label;
+    clearTimeout(historyDebounceTimer);
+    historyDebounceTimer = setTimeout(() => {
+      if (pendingHistoryLabel) {
+        history.push(snapshot(), pendingHistoryLabel);
+        pendingHistoryLabel = null;
+      }
+    }, 400);
+  }
+
+  // Лёгкий commit для частых операций (toggle items)
+  function commitLight(label) {
+    scheduleHistory(label);
+    autoSaver.schedule();
+    scheduleRender();
+  }
+
+  // Тяжёлый commit для редких операций (удаление, создание)
   function commit(label) {
+    clearTimeout(historyDebounceTimer);
+    pendingHistoryLabel = null;
     history.push(snapshot(), label);
     autoSaver.schedule();
     scheduleRender();
@@ -130,7 +156,8 @@
       autoSaver.schedule();
     },
     onDataChanged: (label) => {
-      history.push(snapshot(), label);
+      // Лёгкий commit — не блокируем
+      scheduleHistory(label);
       autoSaver.schedule();
       scheduleRender();
     },
@@ -663,6 +690,7 @@
     for (const item of cat.items) {
       const card = document.createElement('div');
       card.className = 'item-card' + (state.activeItems[cat.id] === item.id ? ' active' : '');
+      card.dataset.itemId = item.id;
 
       if (item.img) {
         const img = document.createElement('img');
@@ -688,34 +716,48 @@
       });
       card.appendChild(del);
 
-      // === Тап / долгое нажатие (БЕЗ двойного тапа) ===
+      // === Тап — выбор / переключение. Долгое нажатие — контекстное меню ===
       let longPressTimer = null;
       let longPressFired = false;
+      let pointerStartX = 0;
+      let pointerStartY = 0;
+      let pointerMoved = false;
 
       const onPressStart = (e) => {
         if (e.target.closest('.del-x')) return;
         longPressFired = false;
+        pointerMoved = false;
+        const touch = e.touches ? e.touches[0] : e;
+        pointerStartX = touch.clientX;
+        pointerStartY = touch.clientY;
+
         longPressTimer = setTimeout(() => {
+          if (pointerMoved) return;
           longPressFired = true;
-          const touch = e.touches ? e.touches[0] : e;
-          openItemContextMenu(touch.clientX, touch.clientY, cat.id, item.id);
+          if (navigator.vibrate) navigator.vibrate(20);
+          openItemContextMenu(pointerStartX, pointerStartY, cat.id, item.id);
         }, 600);
+      };
+
+      const onPressMove = (e) => {
+        if (longPressFired) return;
+        const touch = e.touches ? e.touches[0] : e;
+        const dx = Math.abs(touch.clientX - pointerStartX);
+        const dy = Math.abs(touch.clientY - pointerStartY);
+        if (dx > 8 || dy > 8) {
+          pointerMoved = true;
+          clearTimeout(longPressTimer);
+        }
       };
 
       const onPressEnd = (e) => {
         clearTimeout(longPressTimer);
         if (longPressFired) return;
-        if (e.target.closest('.del-x')) return;
+        if (pointerMoved) return;
+        if (e.target.closest && e.target.closest('.del-x')) return;
 
-        // Обычный тап — переключить активный элемент
-        if (state.activeItems[cat.id] === item.id) {
-          delete state.activeItems[cat.id];
-        } else {
-          state.activeItems[cat.id] = item.id;
-        }
-        renderer.invalidate(cat.id);
-        renderItems();
-        commit('toggle-item');
+        // Переключаем активный элемент
+        toggleItem(cat.id, item.id);
       };
 
       const onPressCancel = () => {
@@ -723,9 +765,11 @@
       };
 
       card.addEventListener('touchstart', onPressStart, { passive: true });
+      card.addEventListener('touchmove', onPressMove, { passive: true });
       card.addEventListener('touchend', onPressEnd);
       card.addEventListener('touchcancel', onPressCancel);
       card.addEventListener('mousedown', onPressStart);
+      card.addEventListener('mousemove', onPressMove);
       card.addEventListener('mouseup', onPressEnd);
 
       card.addEventListener('contextmenu', (e) => {
@@ -741,6 +785,27 @@
     addBtn.textContent = '＋';
     addBtn.addEventListener('click', () => openModalItem(cat.id));
     itemsList.appendChild(addBtn);
+  }
+
+  // Мгновенное переключение без тяжёлого commit
+  function toggleItem(catId, itemId) {
+    const cat = state.categories.find(c => c.id === catId);
+    if (!cat) return;
+
+    if (state.activeItems[catId] === itemId) {
+      delete state.activeItems[catId];
+    } else {
+      state.activeItems[catId] = itemId;
+    }
+
+    // Мгновенно обновляем DOM (без полного ре-рендера списка)
+    const cards = itemsList.querySelectorAll('.item-card[data-item-id]');
+    cards.forEach(c => {
+      c.classList.toggle('active', state.activeItems[catId] === c.dataset.itemId);
+    });
+
+    renderer.invalidate(catId);
+    commitLight('toggle-item');
   }
 
   function deleteItem(catId, itemId) {
@@ -976,7 +1041,7 @@
     });
   }
 
-  // ============ Переименование элемента ============
+  // ============ Переименование ============
   let renamingItemRef = null;
 
   function openItemRename(catId, itemId) {
@@ -1065,17 +1130,12 @@
       });
     });
 
-    document.addEventListener('touchstart', (e) => {
-      if (menu.classList.contains('open') && !menu.contains(e.target)) {
-        closeItemContextMenu();
-      }
-    }, { passive: true });
-    document.addEventListener('mousedown', (e) => {
+    document.addEventListener('pointerdown', (e) => {
       if (menu.classList.contains('open') && !menu.contains(e.target)) {
         closeItemContextMenu();
       }
     });
-    window.addEventListener('scroll', closeItemContextMenu, { passive: true });
+    window.addEventListener('scroll', closeItemContextMenu, { passive: true, capture: true });
     window.addEventListener('resize', closeItemContextMenu);
   }
 
@@ -1406,7 +1466,7 @@
     document.querySelectorAll('.modal-bg').forEach(bg => {
       bg.addEventListener('click', (e) => {
         if (e.target === bg) {
-          // Если открыт автокомплит — не закрываем
+          // Закрываем автокомплит, если открыт
           if (bindingsUI) bindingsUI.closeAutocomplete();
           bg.classList.remove('open');
         }
@@ -1414,6 +1474,7 @@
     });
     document.querySelectorAll('[data-close]').forEach(btn => {
       btn.addEventListener('click', () => {
+        if (bindingsUI) bindingsUI.closeAutocomplete();
         btn.closest('.modal-bg').classList.remove('open');
       });
     });
@@ -1444,7 +1505,6 @@
       }
     });
 
-    // ===== Атрибуты =====
     document.getElementById('btn-attributes').addEventListener('click', () => {
       getBindingsUI().open();
     });
@@ -1459,7 +1519,6 @@
       });
     }
 
-    // ===== Выбор категории для атрибута =====
     const catPickerCancel = document.getElementById('category-picker-cancel');
     if (catPickerCancel) {
       catPickerCancel.addEventListener('click', () => {
@@ -1467,7 +1526,6 @@
       });
     }
 
-    // ===== Галерея =====
     document.getElementById('btn-gallery').addEventListener('click', () => gallery.open());
     document.getElementById('gallery-new').addEventListener('click', async () => {
       const name = prompt('Название персонажа:', 'Персонаж');
@@ -1483,10 +1541,8 @@
       document.getElementById('modal-import').classList.add('open');
     });
 
-    // ===== Слои =====
     document.getElementById('btn-layers').addEventListener('click', openLayers);
 
-    // ===== Новая категория =====
     document.getElementById('btn-add-cat').addEventListener('click', () => {
       document.getElementById('cat-name').value = '';
       document.getElementById('modal-cat').classList.add('open');
@@ -1499,7 +1555,6 @@
       document.getElementById('modal-cat').classList.remove('open');
     });
 
-    // ===== Добавить элементы =====
     document.getElementById('item-save').addEventListener('click', async () => {
       const catId = state.activeCategoryId;
       if (!catId) {
@@ -1521,7 +1576,6 @@
       pendingFiles = [];
     });
 
-    // ===== Переименование элемента =====
     const itemRenameSave = document.getElementById('item-rename-save');
     if (itemRenameSave) itemRenameSave.addEventListener('click', saveItemRename);
     const itemRenameInput = document.getElementById('item-rename-name');
@@ -1534,11 +1588,9 @@
       });
     }
 
-    // ===== Экспорт =====
     document.getElementById('btn-export').addEventListener('click', openExportModal);
     setupExportModal();
 
-    // ===== Импорт =====
     document.getElementById('btn-import').addEventListener('click', () => {
       document.getElementById('import-file').value = '';
       document.getElementById('modal-import').classList.add('open');
@@ -1554,7 +1606,6 @@
       }
     });
 
-    // ===== Новый проект =====
     document.getElementById('btn-new').addEventListener('click', async () => {
       if (!await confirmDialog('Создать нового персонажа? Текущий сохранится в галерее.')) return;
       const name = prompt('Название персонажа:', 'Персонаж');
@@ -1576,12 +1627,10 @@
       toast('Новый персонаж создан');
     });
 
-    // ===== Закрыть панель =====
     document.getElementById('btn-close-items').addEventListener('click', () => {
       itemsPanel.classList.remove('open');
     });
 
-    // ===== Зум =====
     document.getElementById('zoom-in').addEventListener('click', () => setScale(view.scale * 1.25));
     document.getElementById('zoom-out').addEventListener('click', () => setScale(view.scale * 0.8));
     document.getElementById('zoom-100').addEventListener('click', () => {
@@ -1591,7 +1640,6 @@
     });
     document.getElementById('zoom-fit').addEventListener('click', fitToScreen);
 
-    // ===== Инструменты холста =====
     document.getElementById('tool-grid').addEventListener('click', (e) => {
       view.gridOn = !view.gridOn;
       e.currentTarget.classList.toggle('active', view.gridOn);
@@ -1608,7 +1656,6 @@
       applyTransform();
     });
 
-    // ===== Редактирование категории =====
     const saveBtn = document.getElementById('cat-edit-save');
     if (saveBtn) saveBtn.addEventListener('click', saveCategoryEdit);
     const leftBtn = document.getElementById('cat-edit-left');
