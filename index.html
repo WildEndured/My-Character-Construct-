@@ -484,7 +484,7 @@
   .modal-actions .btn { flex: 1; }
   .hint { font-size: 11px; color: #888; margin-top: 6px; }
 
-  /* ===== Список файлов в модалке добавления ===== */
+  /* ===== Список файлов ===== */
   #item-files-list {
     max-height: 40vh;
     overflow-y: auto;
@@ -494,7 +494,6 @@
     background: #1a1a1a;
     -webkit-overflow-scrolling: touch;
   }
-
   .item-file-row {
     display: flex;
     align-items: center;
@@ -503,7 +502,6 @@
     border-bottom: 1px solid #2a2a2a;
   }
   .item-file-row:last-child { border-bottom: none; }
-
   .item-file-row .thumb {
     width: 44px;
     height: 44px;
@@ -515,12 +513,7 @@
     align-items: center;
     justify-content: center;
   }
-  .item-file-row .thumb img {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-  }
-
+  .item-file-row .thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
   .item-file-row .info {
     flex: 1;
     min-width: 0;
@@ -528,7 +521,6 @@
     flex-direction: column;
     gap: 4px;
   }
-
   .item-file-row .original-name {
     font-size: 10px;
     color: #666;
@@ -536,7 +528,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-
   .item-file-row .name-input {
     background: #2a2a2a;
     border: 1px solid #444;
@@ -547,11 +538,7 @@
     width: 100%;
     font-family: inherit;
   }
-  .item-file-row .name-input:focus {
-    border-color: #4a7cff;
-    outline: none;
-  }
-
+  .item-file-row .name-input:focus { border-color: #4a7cff; outline: none; }
   .item-file-row .remove-file {
     width: 28px;
     height: 28px;
@@ -566,11 +553,9 @@
     justify-content: center;
     flex-shrink: 0;
   }
-  .item-file-row .remove-file:active {
-    background: rgba(192,57,43,0.6);
-  }
+  .item-file-row .remove-file:active { background: rgba(192,57,43,0.6); }
 
-  /* ===== Контекстное меню элемента ===== */
+  /* ===== Контекстное меню ===== */
   #item-context-menu {
     position: fixed;
     z-index: 500;
@@ -583,7 +568,6 @@
     display: none;
   }
   #item-context-menu.open { display: block; }
-
   #item-context-menu .ctx-item {
     display: flex;
     align-items: center;
@@ -604,8 +588,8 @@
   }
 
   /* ===== Атрибуты ===== */
-  #modal-attributes .modal { max-width: 760px; }
-  #modal-binding .modal { max-width: 760px; }
+  #modal-attributes .modal { max-width: 800px; }
+  #modal-category-picker .modal { max-width: 700px; }
 
   .attr-module {
     background: #2f2f2f;
@@ -657,6 +641,7 @@
     height: 24px;
     font-size: 14px;
     background: rgba(192,57,43,0.6);
+    flex-shrink: 0;
   }
 
   .attr-row {
@@ -670,7 +655,7 @@
 
   .attr-row-label {
     flex: 1;
-    min-width: 100px;
+    min-width: 90px;
     background: transparent;
     border: none;
     color: #ddd;
@@ -679,6 +664,31 @@
     border-radius: 4px;
   }
   .attr-row-label:focus { background: #1a1a1a; outline: none; }
+
+  .attr-cat-btn {
+    flex: 0 0 auto;
+    min-width: 110px;
+    max-width: 140px;
+    background: #333;
+    border: 1px solid #555;
+    color: #aaa;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+    font-family: inherit;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .attr-cat-btn:active { background: #3a3a3a; }
+  .attr-cat-btn.has-category {
+    background: #2a3a5a;
+    border-color: #4a7cff;
+    color: #fff;
+  }
 
   .attr-row-value {
     flex: 1;
@@ -691,98 +701,56 @@
     font-size: 13px;
   }
   .attr-row-value:focus { border-color: #4a7cff; outline: none; }
+  .attr-row-value:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  .attr-bind-badge {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    background: #444;
-    color: #888;
-    border: none;
-    font-size: 12px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-  .attr-bind-badge.has-bindings { background: #4a7cff; color: #fff; }
-
-  #binding-slots-bar {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 12px;
-    flex-wrap: wrap;
-  }
-  .slot-btn {
-    background: #333;
-    border: 1px solid #555;
-    color: #ddd;
-    padding: 6px 12px;
-    border-radius: 16px;
-    font-size: 12px;
-    cursor: pointer;
-  }
-  .slot-btn.active {
-    background: #4a7cff;
-    border-color: #4a7cff;
-    color: #fff;
-  }
-
-  .binding-category { margin-bottom: 16px; }
-  .binding-category-title {
-    font-size: 13px;
-    color: #4a7cff;
-    font-weight: 600;
-    margin-bottom: 8px;
-    padding-bottom: 4px;
-    border-bottom: 1px solid #444;
-  }
-  .binding-grid {
+  /* ===== Сетка категорий ===== */
+  .category-picker-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+    max-height: 50vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
-  .binding-card {
+  .category-pick-card {
     background: #333;
     border: 2px solid #444;
-    border-radius: 8px;
-    aspect-ratio: 1;
+    border-radius: 10px;
+    padding: 12px 8px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    gap: 4px;
     cursor: pointer;
-    overflow: hidden;
-    position: relative;
-    padding: 4px;
-    font-size: 10px;
-    color: #ccc;
-  }
-  .binding-card.active {
-    border-color: #4a7cff;
-    box-shadow: 0 0 8px rgba(74,124,255,0.5);
-  }
-  .binding-card img {
-    max-width: 100%;
-    max-height: 70%;
-    object-fit: contain;
-    pointer-events: none;
-  }
-  .binding-card-name {
-    position: absolute;
-    bottom: 2px;
-    left: 2px;
-    right: 2px;
-    font-size: 9px;
     text-align: center;
-    color: #bbb;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .category-pick-card:active { background: #3a3a3a; }
+  .category-pick-card.active {
+    border-color: #4a7cff;
+    background: #2a3a5a;
+  }
+  .category-pick-card.unlink {
+    border-color: #c0392b;
+    color: #e74c3c;
+  }
+  .category-pick-card .cat-icon {
+    font-size: 24px;
+    line-height: 1;
+  }
+  .category-pick-card .cat-name {
+    font-size: 12px;
+    color: #fff;
+    font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    background: rgba(0,0,0,0.5);
-    border-radius: 3px;
-    padding: 1px 2px;
+    max-width: 100%;
+  }
+  .category-pick-card .cat-meta {
+    font-size: 10px;
+    color: #888;
   }
 
   /* ===== Галерея ===== */
@@ -1106,15 +1074,13 @@
   </div>
 </div>
 
-<!-- ===== Модалка: добавление элементов с редактированием имён ===== -->
+<!-- ===== Модалка: добавление элементов ===== -->
 <div class="modal-bg" id="modal-item">
   <div class="modal">
     <h3>Добавить элементы</h3>
-
     <label>Изображения (PNG с прозрачностью)</label>
     <input type="file" id="item-file" accept="image/*" multiple>
     <div class="hint">Можно выбрать несколько сразу. Имена можно отредактировать ниже.</div>
-
     <div id="item-files-list-wrap" style="display:none;margin-top:16px;">
       <label>Имена элементов <span id="item-files-count" style="color:#4a7cff;"></span></label>
       <div id="item-files-list"></div>
@@ -1124,7 +1090,6 @@
         <button class="btn" type="button" id="item-names-number" style="flex:1;font-size:12px;min-height:36px;">Нумеровать</button>
       </div>
     </div>
-
     <div class="modal-actions">
       <button class="btn" data-close>Отмена</button>
       <button class="btn primary" id="item-save" disabled>Добавить</button>
@@ -1231,8 +1196,8 @@
   <div class="modal">
     <h3>📋 Атрибуты персонажа</h3>
     <div class="hint" style="margin-bottom:12px;">
-      Заполните поля — связанные элементы подставятся автоматически.
-      Нажмите <strong>⚭</strong> чтобы привязать атрибут к элементу.
+      Привяжите атрибут к <strong>категории</strong>, потом вписывайте имя элемента —
+      нужный элемент подставится автоматически.
     </div>
     <div id="attributes-list"></div>
     <div class="modal-actions">
@@ -1242,7 +1207,7 @@
   </div>
 </div>
 
-<!-- ===== Модалка: выбор категории для атрибута ===== -->
+<!-- ===== Модалка: выбор категории ===== -->
 <div class="modal-bg" id="modal-category-picker">
   <div class="modal">
     <h3>📁 Привязать к категории</h3>
