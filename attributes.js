@@ -1,4 +1,4 @@
-/* attributes.js — система атрибутов и привязок (без рекурсивных коммитов) */
+/* attributes.js — система атрибутов с привязкой к КАТЕГОРИИ (не к элементу) */
 (function(global) {
   'use strict';
 
@@ -9,21 +9,21 @@
         name: 'Модуль Базовой внешности',
         color: '#e8b4b8',
         rows: [
-          { id: 'hair_type', label: 'Волосы', value: '', slots: 0 },
-          { id: 'hair_len', label: 'Длина волос', value: '', slots: 1 },
-          { id: 'hair_color1', label: 'Цвет волос 1', value: '', slots: 1 },
-          { id: 'hair_color2', label: 'Цвет волос 2', value: '', slots: 1 },
-          { id: 'hair_color3', label: 'Цвет волос 3', value: '', slots: 1 },
-          { id: 'hair_mult', label: 'Тип мультицвет', value: '', slots: 1 },
-          { id: 'hair_tex', label: 'Текстура волос', value: '', slots: 1 },
-          { id: 'hair_bang', label: 'Челка', value: '', slots: 1 },
-          { id: 'hair_part', label: 'Прическа', value: '', slots: 1 },
-          { id: 'eyes_shape', label: 'Форма глаз', value: '', slots: 1 },
-          { id: 'eyes_color', label: 'Цвет глаз', value: '', slots: 1 },
-          { id: 'eyes_pupil', label: 'Форма зрачков', value: '', slots: 1 },
-          { id: 'face', label: 'Торс', value: '', slots: 0 },
-          { id: 'skin_color', label: 'Цвет кожи', value: '', slots: 1 },
-          { id: 'chest', label: 'Размер груди', value: '', slots: 1 },
+          { id: 'hair_type', label: 'Волосы', value: '', categoryId: null },
+          { id: 'hair_len', label: 'Длина волос', value: '', categoryId: null },
+          { id: 'hair_color1', label: 'Цвет волос 1', value: '', categoryId: null },
+          { id: 'hair_color2', label: 'Цвет волос 2', value: '', categoryId: null },
+          { id: 'hair_color3', label: 'Цвет волос 3', value: '', categoryId: null },
+          { id: 'hair_mult', label: 'Тип мультицвет', value: '', categoryId: null },
+          { id: 'hair_tex', label: 'Текстура волос', value: '', categoryId: null },
+          { id: 'hair_bang', label: 'Челка', value: '', categoryId: null },
+          { id: 'hair_part', label: 'Прическа', value: '', categoryId: null },
+          { id: 'eyes_shape', label: 'Форма глаз', value: '', categoryId: null },
+          { id: 'eyes_color', label: 'Цвет глаз', value: '', categoryId: null },
+          { id: 'eyes_pupil', label: 'Форма зрачков', value: '', categoryId: null },
+          { id: 'face', label: 'Торс', value: '', categoryId: null },
+          { id: 'skin_color', label: 'Цвет кожи', value: '', categoryId: null },
+          { id: 'chest', label: 'Размер груди', value: '', categoryId: null },
         ],
       },
       {
@@ -31,20 +31,20 @@
         name: 'Модуль одежды',
         color: '#d6e4f0',
         rows: [
-          { id: 'style', label: 'Стиль одежды', value: '', slots: 0 },
-          { id: 'headwear', label: 'Одежда › Headwear', value: '', slots: 3 },
-          { id: 'neckwear', label: 'Одежда › Neckwear', value: '', slots: 3 },
-          { id: 'handwear', label: 'Одежда › Handwear', value: '', slots: 3 },
-          { id: 'topwear1', label: 'Одежда › Topwear 1', value: '', slots: 3 },
-          { id: 'topwear2', label: 'Одежда › Topwear 2', value: '', slots: 3 },
-          { id: 'bottomwear', label: 'Одежда › Bottomwear', value: '', slots: 3 },
-          { id: 'legwear', label: 'Одежда › Legwear', value: '', slots: 3 },
-          { id: 'footwear', label: 'Одежда › Footwear', value: '', slots: 3 },
-          { id: 'acc1', label: 'Одежда › Accessories 1', value: '', slots: 3 },
-          { id: 'acc2', label: 'Одежда › Accessories 2', value: '', slots: 3 },
-          { id: 'acc3', label: 'Одежда › Accessories 3', value: '', slots: 3 },
-          { id: 'acc4', label: 'Одежда › Accessories 4', value: '', slots: 3 },
-          { id: 'acc5', label: 'Одежда › Accessories 5', value: '', slots: 3 },
+          { id: 'style', label: 'Стиль одежды', value: '', categoryId: null },
+          { id: 'headwear', label: 'Одежда › Headwear', value: '', categoryId: null },
+          { id: 'neckwear', label: 'Одежда › Neckwear', value: '', categoryId: null },
+          { id: 'handwear', label: 'Одежда › Handwear', value: '', categoryId: null },
+          { id: 'topwear1', label: 'Одежда › Topwear 1', value: '', categoryId: null },
+          { id: 'topwear2', label: 'Одежда › Topwear 2', value: '', categoryId: null },
+          { id: 'bottomwear', label: 'Одежда › Bottomwear', value: '', categoryId: null },
+          { id: 'legwear', label: 'Одежда › Legwear', value: '', categoryId: null },
+          { id: 'footwear', label: 'Одежда › Footwear', value: '', categoryId: null },
+          { id: 'acc1', label: 'Одежда › Accessories 1', value: '', categoryId: null },
+          { id: 'acc2', label: 'Одежда › Accessories 2', value: '', categoryId: null },
+          { id: 'acc3', label: 'Одежда › Accessories 3', value: '', categoryId: null },
+          { id: 'acc4', label: 'Одежда › Accessories 4', value: '', categoryId: null },
+          { id: 'acc5', label: 'Одежда › Accessories 5', value: '', categoryId: null },
         ],
       },
       {
@@ -52,17 +52,16 @@
         name: 'Модуль расы',
         color: '#f5e6b8',
         rows: [
-          { id: 'race1', label: 'Раса: 1', value: '', slots: 1 },
-          { id: 'race_trait1', label: 'Расовая черта 1', value: '', slots: 1 },
-          { id: 'race_trait2', label: 'Расовая черта 2', value: '', slots: 1 },
-          { id: 'race_trait3', label: 'Расовая черта 3', value: '', slots: 1 },
-          { id: 'race_trait4', label: 'Расовая черта 4', value: '', slots: 1 },
-          { id: 'race_trait5', label: 'Расовая черта 5', value: '', slots: 1 },
-          { id: 'race_trait6', label: 'Расовая черта 6', value: '', slots: 1 },
+          { id: 'race1', label: 'Раса: 1', value: '', categoryId: null },
+          { id: 'race_trait1', label: 'Расовая черта 1', value: '', categoryId: null },
+          { id: 'race_trait2', label: 'Расовая черта 2', value: '', categoryId: null },
+          { id: 'race_trait3', label: 'Расовая черта 3', value: '', categoryId: null },
+          { id: 'race_trait4', label: 'Расовая черта 4', value: '', categoryId: null },
+          { id: 'race_trait5', label: 'Расовая черта 5', value: '', categoryId: null },
+          { id: 'race_trait6', label: 'Расовая черта 6', value: '', categoryId: null },
         ],
       },
     ],
-    bindings: {},
   };
 
   function clone(obj) {
@@ -84,13 +83,6 @@
       state.attributes = clone(schema);
     }
 
-    function loadFromState() {
-      const state = ctx.getState();
-      if (state.attributes) {
-        schema = clone(state.attributes);
-      }
-    }
-
     // ============ Модули ============
     function addModule(name) {
       const mod = {
@@ -106,15 +98,7 @@
     }
 
     function removeModule(moduleId) {
-      const mod = schema.modules.find(m => m.id === moduleId);
-      if (!mod) return;
-      const attrIds = mod.rows.map(r => r.id);
       schema.modules = schema.modules.filter(m => m.id !== moduleId);
-      for (const attrId of attrIds) {
-        for (const slot of [0, 1, 2]) {
-          delete schema.bindings[attrId + '#' + slot];
-        }
-      }
       saveToState();
       ctx.onDataChanged?.('remove-module');
     }
@@ -136,7 +120,7 @@
         id: 'attr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
         label: label || 'Новый атрибут',
         value: '',
-        slots: 1,
+        categoryId: null,
       };
       mod.rows.push(row);
       saveToState();
@@ -148,9 +132,6 @@
       const mod = schema.modules.find(m => m.id === moduleId);
       if (!mod) return;
       mod.rows = mod.rows.filter(r => r.id !== attrId);
-      for (const slot of [0, 1, 2]) {
-        delete schema.bindings[attrId + '#' + slot];
-      }
       saveToState();
       ctx.onDataChanged?.('remove-attribute');
     }
@@ -173,7 +154,6 @@
         if (row) {
           row.value = value;
           saveToState();
-          // Применяем привязки — но БЕЗ коммита истории
           applyBindingsSilent(attrId);
           ctx.onDataChanged?.('set-attribute-value');
           return;
@@ -189,51 +169,55 @@
       return null;
     }
 
-    // ============ Привязки ============
-    function bindAttribute(attrId, categoryId, itemId, slotIndex) {
-      if (slotIndex === undefined) slotIndex = 0;
-      const key = attrId + '#' + slotIndex;
-      schema.bindings[key] = { attrId, categoryId, itemId, slotIndex };
+    // ============ Привязка к КАТЕГОРИИ ============
+    /**
+     * Привязать атрибут к категории
+     * @param {string} attrId
+     * @param {string} categoryId — id категории в редакторе (state.categories)
+     */
+    function bindCategory(attrId, categoryId) {
+      const attrData = getAttribute(attrId);
+      if (!attrData) return;
+      attrData.row.categoryId = categoryId || null;
       saveToState();
       applyBindingsSilent(attrId);
-      ctx.onDataChanged?.('bind-attribute');
+      ctx.onDataChanged?.('bind-category');
     }
 
-    function unbindAttribute(attrId, slotIndex) {
-      if (slotIndex === undefined) slotIndex = 0;
-      const key = attrId + '#' + slotIndex;
-      delete schema.bindings[key];
+    function unbindCategory(attrId) {
+      const attrData = getAttribute(attrId);
+      if (!attrData) return;
+      attrData.row.categoryId = null;
       saveToState();
-      ctx.onDataChanged?.('unbind-attribute');
+      ctx.onDataChanged?.('unbind-category');
     }
 
-    function getBinding(attrId, slotIndex) {
-      if (slotIndex === undefined) slotIndex = 0;
-      return schema.bindings[attrId + '#' + slotIndex];
+    function getBoundCategory(attrId) {
+      const attrData = getAttribute(attrId);
+      if (!attrData) return null;
+      return attrData.row.categoryId || null;
     }
 
-    function getAllBindingsForAttr(attrId) {
-      const result = [];
-      for (const [key, b] of Object.entries(schema.bindings)) {
-        if (b.attrId === attrId) result.push({ key, ...b });
-      }
-      return result;
-    }
-
-    // Найти элемент по значению
+    // Найти элемент по значению в категории
     function findItemForValue(cat, value) {
-      if (!value) return null;
+      if (!cat || !value) return null;
       const target = value.trim();
       const normTarget = normalizeName(target);
+
+      // 1. Точное совпадение id
       let found = cat.items.find(it => it.id.toLowerCase() === target.toLowerCase());
-      if (!found) found = cat.items.find(it => normalizeName(it.name) === normTarget);
-      if (!found) {
-        found = cat.items.find(it =>
-          normalizeName(it.name).includes(normTarget) ||
-          normTarget.includes(normalizeName(it.name))
-        );
-      }
-      return found;
+      if (found) return found;
+
+      // 2. Точное совпадение нормализованного имени
+      found = cat.items.find(it => normalizeName(it.name) === normTarget);
+      if (found) return found;
+
+      // 3. Частичное вхождение
+      found = cat.items.find(it =>
+        normalizeName(it.name).includes(normTarget) ||
+        normTarget.includes(normalizeName(it.name))
+      );
+      return found || null;
     }
 
     // Тихая версия: НЕ вызывает commit, только помечает слои
@@ -243,60 +227,53 @@
       if (!attrData) return { changed: false };
 
       const { row } = attrData;
-      const bindings = getAllBindingsForAttr(attrId);
-      const changedCats = new Set();
+      if (!row.categoryId) return { changed: false };
 
-      for (const binding of bindings) {
-        const cat = state.categories.find(c => c.id === binding.categoryId);
-        if (!cat) continue;
+      const cat = state.categories.find(c => c.id === row.categoryId);
+      if (!cat) return { changed: false };
 
-        if (!row.value) {
-          if (state.activeItems[cat.id]) {
-            delete state.activeItems[cat.id];
-            changedCats.add(cat.id);
-          }
-          continue;
+      let changed = false;
+
+      if (!row.value) {
+        // Пустое значение — снять активный элемент в этой категории
+        if (state.activeItems[cat.id]) {
+          delete state.activeItems[cat.id];
+          changed = true;
         }
-
+      } else {
         const foundItem = findItemForValue(cat, row.value);
         if (foundItem && state.activeItems[cat.id] !== foundItem.id) {
           state.activeItems[cat.id] = foundItem.id;
-          changedCats.add(cat.id);
+          changed = true;
         }
       }
 
-      if (changedCats.size > 0) {
-        for (const catId of changedCats) {
-          ctx.invalidate?.(catId);
-        }
-        ctx.onBindingsChanged?.(changedCats);
+      if (changed) {
+        ctx.invalidate?.(cat.id);
+        ctx.onBindingsChanged?.(new Set([cat.id]));
       }
-      return { changed: changedCats.size > 0 };
+      return { changed };
     }
 
-    // Публичная версия — используется кнопкой "Применить"
     function applyBindings(attrId) {
       const { changed } = applyBindingsSilent(attrId);
       if (changed) ctx.onDataChanged?.('apply-bindings');
     }
 
-    // Массовое применение — ОДИН рендер в конце
+    // Массовое применение — один рендер в конце
     function applyAllBindings() {
       const state = ctx.getState();
       const changedCats = new Set();
 
       for (const mod of schema.modules) {
         for (const row of mod.rows) {
-          if (!row.value) continue;
-          const bindings = getAllBindingsForAttr(row.id);
-          for (const binding of bindings) {
-            const cat = state.categories.find(c => c.id === binding.categoryId);
-            if (!cat) continue;
-            const foundItem = findItemForValue(cat, row.value);
-            if (foundItem && state.activeItems[cat.id] !== foundItem.id) {
-              state.activeItems[cat.id] = foundItem.id;
-              changedCats.add(cat.id);
-            }
+          if (!row.value || !row.categoryId) continue;
+          const cat = state.categories.find(c => c.id === row.categoryId);
+          if (!cat) continue;
+          const foundItem = findItemForValue(cat, row.value);
+          if (foundItem && state.activeItems[cat.id] !== foundItem.id) {
+            state.activeItems[cat.id] = foundItem.id;
+            changedCats.add(cat.id);
           }
         }
       }
@@ -321,6 +298,11 @@
         return;
       }
       schema = clone(data);
+
+      // Миграция: если где-то ещё есть старый формат "bindings" — игнорируем
+      if (data.bindings) {
+        // Старые привязки к элементам → не переносим
+      }
     }
 
     function getSchema() {
@@ -336,11 +318,10 @@
       addModule, removeModule, renameModule,
       addAttribute, removeAttribute, renameAttribute,
       setAttributeValue, getAttribute,
-      bindAttribute, unbindAttribute,
-      getBinding, getAllBindingsForAttr,
+      // Привязки к категориям
+      bindCategory, unbindCategory, getBoundCategory,
       applyBindings, applyAllBindings,
-      getSchema, serialize, deserialize,
-      loadFromState, reset,
+      getSchema, serialize, deserialize, reset,
       normalizeName,
     };
   }
