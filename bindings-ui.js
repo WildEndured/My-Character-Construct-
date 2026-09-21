@@ -16,8 +16,6 @@
     let currentAttrId = null;
     let renderScheduled = false;
     let globalQuery = '';
-
-    // Активный автокомплит
     let activeAutocomplete = null;
 
     function scheduleRender() {
@@ -29,7 +27,6 @@
       });
     }
 
-    // ============ Прогресс ============
     function updateProgress() {
       if (!progressBar || !progressText) return;
       const stats = attributes.getStats();
@@ -43,7 +40,6 @@
       list.innerHTML = '';
       const schema = attributes.getSchema();
       const state = ctx.getState();
-
       const query = globalQuery.trim().toLowerCase();
 
       for (const mod of schema.modules) {
@@ -304,14 +300,10 @@
       valueInput.spellcheck = false;
       valueInput.disabled = !row.categoryId;
 
-      // Фокус — открываем автокомплит
       valueInput.addEventListener('focus', () => {
-        if (boundCat) {
-          openAutocomplete(row.id, valueInput, valueWrap);
-        }
+        if (boundCat) openAutocomplete(row.id, valueInput, valueWrap);
       });
 
-      // Ввод — фильтруем
       valueInput.addEventListener('input', () => {
         attributes.setAttributeValue(row.id, valueInput.value);
         updateStatusBadge(valueWrap, row.id);
@@ -331,7 +323,6 @@
         }
       });
 
-      // Не закрываем автокомплит, если нажали на элемент списка
       valueInput.addEventListener('blur', () => {
         setTimeout(() => {
           if (activeAutocomplete && activeAutocomplete.attrId === row.id) {
@@ -348,7 +339,6 @@
         quickBtn.type = 'button';
         quickBtn.textContent = '▼';
         quickBtn.title = 'Показать все элементы';
-        // Используем pointerdown, чтобы не терять фокус input
         quickBtn.addEventListener('pointerdown', (e) => {
           e.preventDefault();
           valueInput.focus();
@@ -381,7 +371,6 @@
       return rowEl;
     }
 
-    // Обновление статуса — ищем valueWrap по attrId в DOM
     function updateStatusBadge(valueWrap, attrId) {
       if (!valueWrap) {
         valueWrap = list.querySelector(`.attr-value-wrap[data-attr-id="${attrId}"]`);
@@ -436,7 +425,6 @@
 
     // ============ Автокомплит ============
     function openAutocomplete(attrId, input, valueWrap, showAll) {
-      // Если уже открыт для этого атрибута — только обновляем список
       if (activeAutocomplete && activeAutocomplete.attrId === attrId) {
         renderAutocompleteList(showAll ? '' : (input.value || ''));
         return;
@@ -505,14 +493,11 @@
         if (q) {
           const idx = item.name.toLowerCase().indexOf(q);
           if (idx >= 0) {
-            const before = item.name.slice(0, idx);
-            const match = item.name.slice(idx, idx + q.length);
-            const after = item.name.slice(idx + q.length);
-            nameEl.append(before);
+            nameEl.append(item.name.slice(0, idx));
             const mark = document.createElement('mark');
-            mark.textContent = match;
+            mark.textContent = item.name.slice(idx, idx + q.length);
             nameEl.append(mark);
-            nameEl.append(after);
+            nameEl.append(item.name.slice(idx + q.length));
           } else {
             nameEl.textContent = item.name;
           }
@@ -521,7 +506,6 @@
         }
         opt.appendChild(nameEl);
 
-        // Используем pointerdown — срабатывает раньше blur
         const onPick = (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -549,7 +533,6 @@
       rowData.row.value = item.name;
       attributes.setAttributeValue(attrId, item.name);
 
-      // Обновляем input и статус
       const input = list.querySelector(`.attr-row-value[data-attr-id="${attrId}"]`);
       if (input) input.value = item.name;
 
@@ -566,24 +549,13 @@
       }
     }
 
-    // Закрытие при клике вне — используем pointerdown
     document.addEventListener('pointerdown', (e) => {
       if (!activeAutocomplete) return;
       if (activeAutocomplete.el.contains(e.target)) return;
-      if (e.target === activeAutocomplete.input) return;
-      // Быстрый выбор ▼
-      if (e.target.classList && e.target.classList.contains('attr-quick-pick')) return;
-      // Внутри модалки атрибутов — не закрываем если это поле значения
-      if (e.target.classList && e.target.classList.contains('attr-row-value')) return;
+      if (activeAutocomplete.input === e.target) return;
+      if (e.target.tagName === 'INPUT') return;
       closeAutocomplete();
     }, true);
-
-    // Не закрываем при скролле внутри автокомплита
-    window.addEventListener('scroll', (e) => {
-      if (!activeAutocomplete) return;
-      if (activeAutocomplete.el.contains(e.target)) return;
-      closeAutocomplete();
-    }, { passive: true, capture: true });
 
     window.addEventListener('resize', closeAutocomplete);
 
