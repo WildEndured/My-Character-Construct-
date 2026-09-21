@@ -374,6 +374,7 @@
     padding: 4px;
     text-align: center;
     color: #ccc;
+    touch-action: manipulation;
   }
   .item-card.active {
     border-color: #4a7cff;
@@ -383,6 +384,22 @@
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
+    pointer-events: none;
+  }
+  .item-card .item-name-label {
+    position: absolute;
+    bottom: 2px;
+    left: 2px;
+    right: 2px;
+    font-size: 9px;
+    text-align: center;
+    color: #ddd;
+    background: rgba(0,0,0,0.6);
+    border-radius: 3px;
+    padding: 1px 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     pointer-events: none;
   }
   .item-card .del-x {
@@ -467,6 +484,125 @@
   .modal-actions .btn { flex: 1; }
   .hint { font-size: 11px; color: #888; margin-top: 6px; }
 
+  /* ===== Список файлов в модалке добавления ===== */
+  #item-files-list {
+    max-height: 40vh;
+    overflow-y: auto;
+    margin-top: 6px;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    background: #1a1a1a;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .item-file-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-bottom: 1px solid #2a2a2a;
+  }
+  .item-file-row:last-child { border-bottom: none; }
+
+  .item-file-row .thumb {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    background: #2a2a2a;
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .item-file-row .thumb img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .item-file-row .info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .item-file-row .original-name {
+    font-size: 10px;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .item-file-row .name-input {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    color: #fff;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    width: 100%;
+    font-family: inherit;
+  }
+  .item-file-row .name-input:focus {
+    border-color: #4a7cff;
+    outline: none;
+  }
+
+  .item-file-row .remove-file {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(192,57,43,0.3);
+    color: #e74c3c;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .item-file-row .remove-file:active {
+    background: rgba(192,57,43,0.6);
+  }
+
+  /* ===== Контекстное меню элемента ===== */
+  #item-context-menu {
+    position: fixed;
+    z-index: 500;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 10px;
+    padding: 6px;
+    min-width: 210px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    display: none;
+  }
+  #item-context-menu.open { display: block; }
+
+  #item-context-menu .ctx-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #fff;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #item-context-menu .ctx-item:active { background: #3a3a3a; }
+  #item-context-menu .ctx-item.danger { color: #e74c3c; }
+  #item-context-menu .ctx-item .icon {
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+  }
+
   /* ===== Атрибуты ===== */
   #modal-attributes .modal { max-width: 760px; }
   #modal-binding .modal { max-width: 760px; }
@@ -497,10 +633,7 @@
     padding: 4px 6px;
     border-radius: 4px;
   }
-  .attr-module-title:focus {
-    background: rgba(0,0,0,0.2);
-    outline: none;
-  }
+  .attr-module-title:focus { background: rgba(0,0,0,0.2); outline: none; }
 
   .attr-module-actions { display: flex; gap: 4px; }
 
@@ -575,7 +708,6 @@
   }
   .attr-bind-badge.has-bindings { background: #4a7cff; color: #fff; }
 
-  /* ===== Модалка привязки ===== */
   #binding-slots-bar {
     display: flex;
     gap: 6px;
@@ -940,7 +1072,7 @@
   <div id="categories"></div>
 </div>
 
-<!-- Модалка: новая категория -->
+<!-- ===== Модалка: новая категория ===== -->
 <div class="modal-bg" id="modal-cat">
   <div class="modal">
     <h3>Новая категория</h3>
@@ -953,7 +1085,7 @@
   </div>
 </div>
 
-<!-- Модалка: редактирование категории -->
+<!-- ===== Модалка: редактирование категории ===== -->
 <div class="modal-bg" id="modal-cat-edit">
   <div class="modal">
     <h3>Категория</h3>
@@ -974,23 +1106,46 @@
   </div>
 </div>
 
-<!-- Модалка: новый элемент -->
+<!-- ===== Модалка: добавление элементов с редактированием имён ===== -->
 <div class="modal-bg" id="modal-item">
   <div class="modal">
-    <h3>Добавить элемент</h3>
-    <label>Название</label>
-    <input type="text" id="item-name" placeholder="Например: Круглые глаза">
-    <label>Изображение (PNG с прозрачностью)</label>
+    <h3>Добавить элементы</h3>
+
+    <label>Изображения (PNG с прозрачностью)</label>
     <input type="file" id="item-file" accept="image/*" multiple>
-    <div class="hint">Можно выбрать несколько сразу. Рекомендуется PNG 4096×4096.</div>
+    <div class="hint">Можно выбрать несколько сразу. Имена можно отредактировать ниже.</div>
+
+    <div id="item-files-list-wrap" style="display:none;margin-top:16px;">
+      <label>Имена элементов <span id="item-files-count" style="color:#4a7cff;"></span></label>
+      <div id="item-files-list"></div>
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <button class="btn" type="button" id="item-names-clear" style="flex:1;font-size:12px;min-height:36px;">Очистить</button>
+        <button class="btn" type="button" id="item-names-strip-ext" style="flex:1;font-size:12px;min-height:36px;">Убрать .png</button>
+        <button class="btn" type="button" id="item-names-number" style="flex:1;font-size:12px;min-height:36px;">Нумеровать</button>
+      </div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn" data-close>Отмена</button>
-      <button class="btn primary" id="item-save">Добавить</button>
+      <button class="btn primary" id="item-save" disabled>Добавить</button>
     </div>
   </div>
 </div>
 
-<!-- Модалка: слои -->
+<!-- ===== Модалка: переименование элемента ===== -->
+<div class="modal-bg" id="modal-item-rename">
+  <div class="modal">
+    <h3>Переименовать элемент</h3>
+    <label>Название</label>
+    <input type="text" id="item-rename-name" placeholder="Название элемента">
+    <div class="modal-actions">
+      <button class="btn" data-close>Отмена</button>
+      <button class="btn primary" id="item-rename-save">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Модалка: слои ===== -->
 <div class="modal-bg" id="modal-layers">
   <div class="modal">
     <h3>Слои (порядок отрисовки)</h3>
@@ -1004,7 +1159,7 @@
   </div>
 </div>
 
-<!-- Модалка: галерея -->
+<!-- ===== Модалка: галерея ===== -->
 <div class="modal-bg" id="gallery-modal">
   <div class="modal">
     <h3>Мои персонажи</h3>
@@ -1019,7 +1174,7 @@
   </div>
 </div>
 
-<!-- Модалка: экспорт -->
+<!-- ===== Модалка: экспорт ===== -->
 <div class="modal-bg" id="modal-export">
   <div class="modal">
     <h3>Экспорт</h3>
@@ -1057,7 +1212,7 @@
   </div>
 </div>
 
-<!-- Модалка: импорт -->
+<!-- ===== Модалка: импорт ===== -->
 <div class="modal-bg" id="modal-import">
   <div class="modal">
     <h3>Импорт проекта</h3>
@@ -1071,7 +1226,7 @@
   </div>
 </div>
 
-<!-- Модалка: атрибуты -->
+<!-- ===== Модалка: атрибуты ===== -->
 <div class="modal-bg" id="modal-attributes">
   <div class="modal">
     <h3>📋 Атрибуты персонажа</h3>
@@ -1087,7 +1242,7 @@
   </div>
 </div>
 
-<!-- Модалка: выбор привязки -->
+<!-- ===== Модалка: выбор привязки ===== -->
 <div class="modal-bg" id="modal-binding">
   <div class="modal">
     <h3>⚭ Привязка атрибута</h3>
@@ -1103,7 +1258,27 @@
   </div>
 </div>
 
-<!-- Индикаторы -->
+<!-- ===== Контекстное меню элемента ===== -->
+<div id="item-context-menu">
+  <div class="ctx-item" data-action="rename">
+    <span class="icon">✏️</span>
+    <span>Переименовать</span>
+  </div>
+  <div class="ctx-item" data-action="duplicate">
+    <span class="icon">📋</span>
+    <span>Дублировать</span>
+  </div>
+  <div class="ctx-item" data-action="move">
+    <span class="icon">➡️</span>
+    <span>Переместить в категорию</span>
+  </div>
+  <div class="ctx-item danger" data-action="delete">
+    <span class="icon">🗑️</span>
+    <span>Удалить</span>
+  </div>
+</div>
+
+<!-- ===== Индикаторы ===== -->
 <div id="toasts"></div>
 <div id="save-indicator">💾 Сохранено</div>
 
@@ -1132,7 +1307,6 @@
   </div>
 </div>
 
-<!-- Модули -->
 <script src="./storage.js"></script>
 <script src="./history.js"></script>
 <script src="./renderer.js"></script>
@@ -1142,7 +1316,6 @@
 <script src="./bindings-ui.js"></script>
 <script src="./app.js"></script>
 
-<!-- PWA -->
 <script>
 (function() {
   'use strict';
